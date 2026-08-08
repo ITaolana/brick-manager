@@ -1,9 +1,20 @@
-// IndexedDB Database Module for BrickManager
-// Offline-first data storage
+// IndexedDB + Firebase Sync for BrickManager
+// Offline-first with real-time sync
 
 const DB_NAME = 'BrickManagerDB';
 const DB_VERSION = 1;
 let db = null;
+let firestore = null;
+let firebaseSyncing = false;
+
+const firebaseConfig = {
+    apiKey: "AIzaSyALdutyUh2TQUCHC-pYNkGuc1F9n-H8UXI",
+    authDomain: "brick-manager-e10f0.firebaseapp.com",
+    projectId: "brick-manager-e10f0",
+    storageBucket: "brick-manager-e10f0.firebasestorage.app",
+    messagingSenderId: "520731218541",
+    appId: "1:520731218541:web:bc7b2623fc4029508fa564"
+};
 
 // Initialize Database
 async function initDB() {
@@ -20,34 +31,28 @@ async function initDB() {
         request.onupgradeneeded = (event) => {
             const database = event.target.result;
 
-            // Workers table
             if (!database.objectStoreNames.contains('workers')) {
                 const workerStore = database.createObjectStore('workers', { keyPath: 'id', autoIncrement: true });
                 workerStore.createIndex('name', 'name', { unique: false });
             }
 
-            // Attendance table
             if (!database.objectStoreNames.contains('attendance')) {
                 const attendStore = database.createObjectStore('attendance', { keyPath: 'id', autoIncrement: true });
                 attendStore.createIndex('worker_id', 'worker_id', { unique: false });
                 attendStore.createIndex('date', 'date', { unique: false });
             }
 
-            // Customers table
             if (!database.objectStoreNames.contains('customers')) {
                 const custStore = database.createObjectStore('customers', { keyPath: 'id', autoIncrement: true });
                 custStore.createIndex('name', 'name', { unique: false });
                 custStore.createIndex('payment_date', 'payment_date', { unique: false });
-                custStore.createIndex('delivery_status', 'delivery_status', { unique: false });
             }
 
-            // Expenses table
             if (!database.objectStoreNames.contains('expenses')) {
                 const expStore = database.createObjectStore('expenses', { keyPath: 'id', autoIncrement: true });
                 expStore.createIndex('date', 'date', { unique: false });
             }
 
-            // Settings table
             if (!database.objectStoreNames.contains('settings')) {
                 database.createObjectStore('settings', { keyPath: 'key' });
             }
@@ -55,7 +60,23 @@ async function initDB() {
     });
 }
 
-// Generic CRUD operations
+// Initialize Firebase
+async function initFirebase() {
+    try {
+        firebase.initializeApp(firebaseConfig);
+        firestore = firebase.firestore();
+        
+        // Enable offline persistence
+        await firestore.enablePersistence({ synchronizeTabs: true });
+        
+        console.log('Firebase initialized with offline persistence');
+        startFirebaseSync();
+    } catch (e) {
+        console.log('Firebase init failed (may be offline):', e.message);
+    }
+}
+
+// Generic CRUD - Local IndexedDB
 function getAll(storeName) {
     return new Promise((resolve, reject) => {
         const tx = db.transaction(storeName, 'readonly');
@@ -82,7 +103,10 @@ function add(storeName, data) {
         const store = tx.objectStore(storeName);
         data.created_at = new Date().toISOString();
         const request = store.add(data);
-        request.onsuccess = () => resolve(request.result);
+        request.onsuccess = () => {
+            resolve(request.result);
+            syncToFirebase(storeName);
+        };
         request.onerror = () => reject(request.error);
     });
 }
@@ -92,7 +116,10 @@ function update(storeName, data) {
         const tx = db.transaction(storeName, 'readwrite');
         const store = tx.objectStore(storeName);
         const request = store.put(data);
-        request.onsuccess = () => resolve(request.result);
+        request.onsuccess = () => {
+            resolve(request.result);
+            syncToFirebase(storeName);
+        };
         request.onerror = () => reject(request.error);
     });
 }
@@ -102,9 +129,89 @@ function remove(storeName, id) {
         const tx = db.transaction(storeName, 'readwrite');
         const store = tx.objectStore(storeName);
         const request = store.delete(Number(id));
-        request.onsuccess = () => resolve();
+        request.onsuccess = () => {
+            resolve();
+            syncToFirebase(storeName);
+        };
         request.onerror = () => reject(request.error);
     });
+}
+
+// Firebase Sync
+async function syncToFirebase(storeName) {
+    if (!firestore || firebaseSyncing) return;
+    
+    try {
+        const items = await getAll(storeName);
+        const docRef = firestore.collection(storeName).doc('data');
+        await docRef.set({ items, lastSync: new Date().toISOString() });
+    } catch (e) {
+        console.log('Sync failed:', e.message);
+    }
+}
+
+async function syncFromFirebase(storeName) {
+    if (!firestore || firebaseSyncing) return;
+    
+    try {
+        const doc = await firestore.collection(storeName).doc('data').get();
+        if (doc.exists) {
+            const data = doc.data();
+            if (data.items) {
+                // Merge with local
+                const localItems = await getAll(storeName);
+                const localIds = new Set(localItems.map(i => i.id));
+                
+                const tx = db.transaction(storeName, 'readwrite');
+                const store = tx.objectStore(storeName);
+                
+                for (const item of data.items) {
+                    if (!localIds.has(item.id)) {
+                        store.put(item);
+                    }
+                }
+                console.log(`Synced ${storeName} from Firebase`);
+            }
+        }
+    } catch (e) {
+        console.log('Sync from Firebase failed:', e.message);
+    }
+}
+
+function startFirebaseSync() {
+    if (!firestore) return;
+    
+    // Sync all stores on load
+    ['workers', 'customers', 'expenses', 'settings'].forEach(store => {
+        syncFromFirebase(store);
+        
+        // Listen for real-time changes
+        firestore.collection(store).doc('data').onSnapshot((doc) => {
+            if (doc.exists && !firebaseSyncing) {
+                firebaseSyncing = true;
+                const data = doc.data();
+                if (data.items) {
+                    mergeFromFirebase(store, data.items);
+                }
+                setTimeout(() => firebaseSyncing = false, 1000);
+            }
+        });
+    });
+}
+
+async function mergeFromFirebase(storeName, firebaseItems) {
+    const localItems = await getAll(storeName);
+    const localMap = new Map(localItems.map(i => [i.id, i]));
+    
+    const tx = db.transaction(storeName, 'readwrite');
+    const store = tx.objectStore(storeName);
+    
+    for (const item of firebaseItems) {
+        const local = localMap.get(item.id);
+        if (!local || new Date(item.updated_at || 0) > new Date(local.updated_at || 0)) {
+            store.put(item);
+        }
+    }
 }
 
 // Workers
@@ -117,10 +224,12 @@ async function getWorker(id) {
 }
 
 async function addWorker(data) {
+    data.updated_at = new Date().toISOString();
     return add('workers', data);
 }
 
 async function updateWorker(data) {
+    data.updated_at = new Date().toISOString();
     return update('workers', data);
 }
 
@@ -142,9 +251,9 @@ async function getAttendanceByWorkerAndDate(workerId, date) {
 async function saveAttendance(workerId, date, status) {
     const existing = await getAttendanceByWorkerAndDate(workerId, date);
     if (existing) {
-        return update('attendance', { ...existing, status });
+        return update('attendance', { ...existing, status, updated_at: new Date().toISOString() });
     } else {
-        return add('attendance', { worker_id: workerId, date, status });
+        return add('attendance', { worker_id: workerId, date, status, updated_at: new Date().toISOString() });
     }
 }
 
@@ -157,6 +266,7 @@ async function deleteAllAttendance() {
     for (const item of all) {
         await remove('attendance', item.id);
     }
+    syncToFirebase('attendance');
 }
 
 // Customers
@@ -169,23 +279,17 @@ async function getCustomer(id) {
 }
 
 async function addCustomer(data) {
+    data.updated_at = new Date().toISOString();
     return add('customers', data);
 }
 
 async function updateCustomer(data) {
+    data.updated_at = new Date().toISOString();
     return update('customers', data);
 }
 
 async function deleteCustomer(id) {
     return remove('customers', id);
-}
-
-async function getCustomersByDateRange(startDate, endDate) {
-    const all = await getCustomers();
-    return all.filter(c => {
-        const paymentDate = new Date(c.payment_date);
-        return paymentDate >= new Date(startDate) && paymentDate <= new Date(endDate);
-    });
 }
 
 // Expenses
@@ -194,19 +298,12 @@ async function getExpenses() {
 }
 
 async function addExpense(data) {
+    data.updated_at = new Date().toISOString();
     return add('expenses', data);
 }
 
 async function deleteExpense(id) {
     return remove('expenses', id);
-}
-
-async function getExpensesByDateRange(startDate, endDate) {
-    const all = await getExpenses();
-    return all.filter(e => {
-        const expDate = new Date(e.date);
-        return expDate >= new Date(startDate) && expDate <= new Date(endDate);
-    });
 }
 
 // Settings
@@ -216,10 +313,10 @@ async function getSetting(key) {
 }
 
 async function setSetting(key, value) {
-    return update('settings', { key, value });
+    return update('settings', { key, value, updated_at: new Date().toISOString() });
 }
 
-// Clear all data
+// Clear all
 async function clearAllData() {
     const stores = ['workers', 'attendance', 'customers', 'expenses', 'settings'];
     for (const store of stores) {
@@ -228,9 +325,14 @@ async function clearAllData() {
             await remove(store, item.id);
         }
     }
+    if (firestore) {
+        for (const store of stores) {
+            await firestore.collection(store).doc('data').delete();
+        }
+    }
 }
 
-// Export all data as JSON
+// Export
 async function exportAllData() {
     const workers = await getWorkers();
     const attendance = await getAllAttendance();
@@ -249,7 +351,6 @@ async function exportAllData() {
     };
 }
 
-// Auto-reset attendance after pay date
 async function checkAndResetAttendance() {
     const payDate = await getSetting('pay_date') || '25';
     const today = new Date();
@@ -260,4 +361,4 @@ async function checkAndResetAttendance() {
     }
 }
 
-console.log('Database module loaded');
+console.log('Database module loaded with Firebase sync');

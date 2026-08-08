@@ -4,6 +4,17 @@ A mobile-first admin application for brick manufacturing businesses. Manage work
 
 ## Features
 
+### Multi-Admin Sync Setup
+
+To enable real-time sync between multiple admins:
+
+1. Go to [firebase.google.com](https://firebase.google.com) and create a free project
+2. Enable **Firestore Database** (Start in Test Mode)
+3. Copy your Firebase config
+4. Contact developer to integrate
+
+**Note**: The current version works offline on each device. To sync between admins, Firebase integration is required.
+
 ### Worker Management
 - Add, edit, and delete workers
 - Track daily attendance (Present/Absent)

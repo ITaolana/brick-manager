@@ -6,6 +6,7 @@ let enteredWorkers = [];
 // Initialize app
 document.addEventListener('DOMContentLoaded', async () => {
     await initDB();
+    await initFirebase();
     await checkPINSetup();
     setupPINKeypad();
     setupTodayDate();
