@@ -21,12 +21,7 @@ async function checkPINSetup() {
 }
 
 function setupPINKeypad() {
-    const keys = document.querySelectorAll('.key');
-    for (let i = 0; i < keys.length; i++) {
-        keys[i].onclick = function() {
-            handlePINKey(this.dataset.key);
-        };
-    }
+    // Keypad is set up via onclick in HTML
 }
 
 function handlePINKey(key) {
@@ -526,6 +521,15 @@ async function resetApp() {
 
 function logout() {
     location.reload();
+}
+
+function resetPIN() {
+    if (confirm('This will clear your PIN and ALL data. Are you sure?')) {
+        clearAllData();
+        localStorage.clear();
+        alert('App reset! Refresh to set new PIN.');
+        location.reload();
+    }
 }
 
 function setupTodayDate() {
