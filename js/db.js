@@ -149,25 +149,22 @@ async function getExpenses() { return getAll('expenses'); }
 async function addExpense(data) { return add('expenses', data); }
 async function deleteExpense(id) { return remove('expenses', id); }
 
-// Settings
+// Settings - use localStorage for simplicity
 async function getSetting(key) {
-    const item = await getById('settings', key);
-    return item ? item.value : null;
+    return localStorage.getItem('brick_' + key);
 }
 
 async function setSetting(key, value) {
-    return update('settings', { key, value });
+    localStorage.setItem('brick_' + key, value);
 }
 
 // Clear all
 async function clearAllData() {
-    const stores = ['workers', 'attendance', 'customers', 'expenses', 'settings'];
-    for (const store of stores) {
-        const items = await getAll(store);
-        for (const item of items) {
-            await remove(store, item.id);
-        }
-    }
+    // Clear localStorage settings
+    localStorage.removeItem('brick_pin');
+    // Clear IndexedDB
+    const req = indexedDB.deleteDatabase('BrickManagerDB');
+    req.onsuccess = () => console.log('DB deleted');
 }
 
 // Export

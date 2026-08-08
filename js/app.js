@@ -5,15 +5,19 @@ let enteredWorkers = [];
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', async () => {
-    await initDB();
+    try {
+        await initDB();
+    } catch (e) {
+        console.log('DB init error:', e);
+    }
     await checkPINSetup();
-    setupPINKeypad();
     setupTodayDate();
     checkAndResetAttendance();
 });
 
 async function checkPINSetup() {
     const existingPIN = await getSetting('pin');
+    console.log('Existing PIN:', existingPIN);
     if (!existingPIN) {
         pinMode = 'setup';
         document.getElementById('pin-message').textContent = 'Create a 4-digit PIN';
@@ -50,9 +54,11 @@ function updatePINDots() {
 }
 
 async function validatePIN() {
+    console.log('Validating PIN, mode:', pinMode, 'currentPIN:', currentPIN);
     if (pinMode === 'setup') {
         if (currentPIN.length === 4) {
             await setSetting('pin', currentPIN);
+            console.log('PIN saved');
             pinMode = 'enter';
             currentPIN = '';
             updatePINDots();
@@ -63,6 +69,7 @@ async function validatePIN() {
         }
     } else {
         const storedPIN = await getSetting('pin');
+        console.log('Stored PIN:', storedPIN);
         if (currentPIN === storedPIN) {
             currentPIN = '';
             updatePINDots();
@@ -77,6 +84,7 @@ async function validatePIN() {
 }
 
 function showScreen(screenId) {
+    console.log('Showing screen:', screenId);
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById(screenId).classList.add('active');
     document.getElementById('menu-dropdown').classList.remove('show');
