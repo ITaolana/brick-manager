@@ -7,14 +7,24 @@ let db = null;
 let firestore = null;
 let firebaseSyncing = false;
 
-const firebaseConfig = {
-    apiKey: "AIzaSyALdutyUh2TQUCHC-pYNkGuc1F9n-H8UXI",
-    authDomain: "brick-manager-e10f0.firebaseapp.com",
-    projectId: "brick-manager-e10f0",
-    storageBucket: "brick-manager-e10f0.firebasestorage.app",
-    messagingSenderId: "520731218541",
-    appId: "1:520731218541:web:bc7b2623fc4029508fa564"
-};
+// Firebase config - load from server or environment
+// For production, use a backend to proxy requests
+let firebaseConfig = null;
+
+async function loadFirebaseConfig() {
+    // Try to load from localStorage (set after admin configures)
+    const stored = localStorage.getItem('firebaseConfig');
+    if (stored) {
+        return JSON.parse(stored);
+    }
+    return null;
+}
+
+async function configureFirebase(config) {
+    firebaseConfig = config;
+    localStorage.setItem('firebaseConfig', JSON.stringify(config));
+    await initFirebase();
+}
 
 // Initialize Database
 async function initDB() {
@@ -62,6 +72,15 @@ async function initDB() {
 
 // Initialize Firebase
 async function initFirebase() {
+    if (!firebaseConfig) {
+        const config = await loadFirebaseConfig();
+        if (!config) {
+            console.log('Firebase not configured - running in offline mode');
+            return;
+        }
+        firebaseConfig = config;
+    }
+    
     try {
         firebase.initializeApp(firebaseConfig);
         firestore = firebase.firestore();

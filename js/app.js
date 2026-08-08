@@ -6,6 +6,16 @@ let enteredWorkers = [];
 // Initialize app
 document.addEventListener('DOMContentLoaded', async () => {
     await initDB();
+    
+    // Check if Firebase is configured, if not show config screen
+    const storedConfig = localStorage.getItem('firebaseConfig');
+    const skipped = localStorage.getItem('firebaseSkipped');
+    
+    if (!storedConfig && !skipped) {
+        showScreen('config-screen');
+        return;
+    }
+    
     await initFirebase();
     await checkPINSetup();
     setupPINKeypad();
@@ -394,7 +404,7 @@ async function loadCustomers() {
                 <div class="list-item-actions">
                     ${c.needs_delivery ? `<button class="deliver-btn" onclick="toggleDelivery(${c.id})">${c.delivery_status === 'delivered' ? 'Undo' : 'Deliver'}</button>` : ''}
                     <button class="edit-btn" onclick="showAddCustomer(${c.id})">Edit</button>
-                    <button class="delete-btn" onclick="deleteCustomer(${c.id})">Delete</button>
+                    <button class="delete-btn" onclick="deleteCustomerRecord(${c.id})">Delete</button>
                 </div>
             </div>
         `;
@@ -409,7 +419,7 @@ async function toggleDelivery(id) {
     loadDashboardStats();
 }
 
-async function deleteCustomer(id) {
+async function deleteCustomerRecord(id) {
     if (confirm('Delete this customer?')) {
         await deleteCustomer(id);
         loadCustomers();
@@ -582,6 +592,31 @@ async function resetPIN() {
             location.reload();
         }
     }
+}
+
+async function saveFirebaseConfig() {
+    const config = {
+        apiKey: document.getElementById('config-apiKey').value,
+        authDomain: document.getElementById('config-authDomain').value,
+        projectId: document.getElementById('config-projectId').value,
+        storageBucket: document.getElementById('config-storageBucket').value,
+        messagingSenderId: document.getElementById('config-messagingSenderId').value,
+        appId: document.getElementById('config-appId').value
+    };
+    
+    if (!config.apiKey || !config.projectId) {
+        alert('Please enter at least apiKey and projectId');
+        return;
+    }
+    
+    localStorage.setItem('firebaseConfig', JSON.stringify(config));
+    await initFirebase();
+    showScreen('pin-screen');
+}
+
+function skipConfig() {
+    localStorage.setItem('firebaseSkipped', 'true');
+    showScreen('pin-screen');
 }
 
 // Modal helpers
