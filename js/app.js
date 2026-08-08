@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function checkPINSetup() {
     const existingPIN = await getSetting('pin');
     console.log('Existing PIN:', existingPIN);
-    if (!existingPIN) {
+    if (!existingPIN || existingPIN === 'null' || existingPIN === '') {
         pinMode = 'setup';
         document.getElementById('pin-message').textContent = 'Create a 4-digit PIN';
     }
