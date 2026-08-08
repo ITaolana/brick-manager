@@ -573,6 +573,17 @@ function logout() {
     location.reload();
 }
 
+async function resetPIN() {
+    if (confirm('This will clear your PIN and all data. Are you sure?')) {
+        if (confirm('All data will be lost. Continue?')) {
+            await clearAllData();
+            localStorage.clear();
+            alert('App reset! Refresh to set new PIN.');
+            location.reload();
+        }
+    }
+}
+
 // Modal helpers
 function showModal(modalId) {
     document.getElementById(modalId).classList.add('show');

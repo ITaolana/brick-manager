@@ -137,6 +137,18 @@ header .add-btn {
     background: var(--white);
 }
 
+.forgot-pin {
+    color: var(--light);
+    font-size: 0.85rem;
+    margin-top: 20px;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.forgot-pin:hover {
+    color: var(--white);
+}
+
 .pin-keypad {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
