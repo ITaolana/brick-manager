@@ -21,14 +21,15 @@ async function checkPINSetup() {
 }
 
 function setupPINKeypad() {
-    document.querySelectorAll('.key').forEach(key => {
-        key.addEventListener('click', handlePINKey);
-    });
+    const keys = document.querySelectorAll('.key');
+    for (let i = 0; i < keys.length; i++) {
+        keys[i].onclick = function() {
+            handlePINKey(this.dataset.key);
+        };
+    }
 }
 
-function handlePINKey(e) {
-    const key = e.target.dataset.key;
-    
+function handlePINKey(key) {
     if (key === 'clear') {
         currentPIN = '';
         updatePINDots();
