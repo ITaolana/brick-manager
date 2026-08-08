@@ -84,19 +84,14 @@ async function loadDashboardStats() {
     const pendingDeliveries = customers.filter(c => c.needs_delivery && c.delivery_status === 'pending');
     document.getElementById('pending-deliveries').textContent = pendingDeliveries.length;
 
-    // Today's cash received
-    const todayCustomers = customers.filter(c => c.date === today);
-    const todayTotal = todayCustomers.reduce((sum, c) => sum + Number(c.amount), 0);
+    const todayTotal = customers.filter(c => c.date === today).reduce((sum, c) => sum + Number(c.amount), 0);
     document.getElementById('cash-received').textContent = 'R' + todayTotal.toLocaleString();
 
-    // Petty cash (expenses)
     const expenses = await getExpenses();
     const totalExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
     document.getElementById('petty-cash').textContent = 'R' + totalExpenses.toLocaleString();
 
-    // Cash in bank = total sales - total expenses
-    const allCustomers = await getCustomers();
-    const totalSales = allCustomers.reduce((sum, c) => sum + Number(c.amount), 0);
+    const totalSales = customers.reduce((sum, c) => sum + Number(c.amount), 0);
     const bankBalance = totalSales - totalExpenses;
     document.getElementById('cash-in-bank').textContent = 'R' + bankBalance.toLocaleString();
 }
@@ -117,16 +112,68 @@ async function showAddWorker() {
 async function showWorkers() {
     showScreen('workers-screen');
     const workers = await getWorkers();
+    const payDay = parseInt(await getSetting('pay_date') || '25');
+    
     const list = document.getElementById('workers-list');
     if (!list) return;
-    list.innerHTML = workers.length === 0 ? '<p style="text-align:center;color:gray;">No workers added</p>' : 
-        workers.map(w => `<div class="list-item">
-            <div class="list-item-info"><h4>${w.name}</h4><p>${w.role}</p></div>
-            <div class="list-item-actions">
-                <button class="edit-btn" onclick="editWorker(${w.id})">Edit</button>
-                <button class="delete-btn" onclick="deleteWorkerRecord(${w.id})">Delete</button>
-            </div>
-        </div>`).join('');
+    
+    if (workers.length === 0) {
+        list.innerHTML = '<p style="text-align:center;color:gray;">No workers added</p>';
+        return;
+    }
+    
+    // Get attendance for current period
+    const attendance = await getAttendanceForPayPeriod(payDay);
+    const payments = await getWorkerPayments();
+    const today = new Date();
+    const currentMonth = today.toISOString().slice(0, 7);
+    
+    list.innerHTML = `<table style="width:100%;border-collapse:collapse">
+        <tr style="background:#2c3e50;color:white">
+            <th style="padding:10px;text-align:left">Worker</th>
+            <th style="padding:10px">Days Worked</th>
+            <th style="padding:10px">This Month</th>
+            <th style="padding:10px">Action</th>
+        </tr>
+        ${workers.map(w => {
+            const daysWorked = attendance.filter(a => a.worker_id === w.id).length;
+            const payment = payments.find(p => p.worker_id === w.id && p.month === currentMonth);
+            return `<tr style="border-bottom:1px solid #eee">
+                <td style="padding:10px">${w.name}<br><small>${w.role}</small></td>
+                <td style="padding:10px;text-align:center">${daysWorked}</td>
+                <td style="padding:10px;text-align:center">${payment ? 'R'+payment.amount : '-'}</td>
+                <td style="padding:10px;text-align:center">
+                    <button onclick="payWorker(${w.id})" style="background:#27ae60;color:white;border:none;padding:5px 10px;border-radius:4px">Pay</button>
+                </td>
+            </tr>`;
+        }).join('')}
+    </table>`;
+}
+
+async function payWorker(workerId) {
+    const worker = await getWorker(workerId);
+    const amount = prompt(`Enter payment amount for ${worker.name}:`);
+    if (!amount || isNaN(amount)) { alert('Invalid amount'); return; }
+    
+    const today = new Date();
+    const month = today.toISOString().slice(0, 7);
+    
+    await addWorkerPayment({ worker_id: workerId, amount: Number(amount), month, date: today.toISOString().split('T')[0] });
+    
+    // Deduct from cash in bank
+    const customers = await getCustomers();
+    const expenses = await getExpenses();
+    const totalSales = customers.reduce((sum, c) => sum + Number(c.amount), 0);
+    const totalExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+    const currentBank = totalSales - totalExpenses;
+    
+    if (currentBank >= Number(amount)) {
+        await addExpense({ description: `Payment to ${worker.name}`, amount: Number(amount), date: today.toISOString().split('T')[0] });
+    }
+    
+    alert(`Paid R${amount} to ${worker.name}`);
+    showWorkers();
+    loadDashboardStats();
 }
 
 async function editWorker(id) {
@@ -143,8 +190,8 @@ async function deleteWorkerRecord(id) {
 // Attendance
 async function showAttendance() {
     showScreen('attendance-screen');
-    const payDate = await getSetting('pay_date') || '25';
-    document.getElementById('pay-date').value = payDate;
+    const payDay = parseInt(await getSetting('pay_date') || '25');
+    document.getElementById('pay-date').value = payDay;
     await loadWorkersForAttendance();
     loadAttendance();
 }
@@ -180,16 +227,7 @@ async function markAttendance(workerId, status) {
     alert(status === 'present' ? 'Marked Present' : 'Marked Absent');
 }
 
-async function saveAllAttendance() {
-    const date = document.getElementById('attendance-date').value || new Date().toISOString().split('T')[0];
-    for (const [workerId, status] of Object.entries(currentAttendance)) {
-        await saveAttendance(workerId, date, status);
-    }
-    alert('Attendance saved!');
-    loadDashboardStats();
-}
-
-// Cash Received (Customers)
+// Cash Received
 async function showCustomers() {
     showScreen('customers-screen');
     document.getElementById('customer-search').value = '';
@@ -235,7 +273,6 @@ async function showAddCustomer() {
     if (!amount || isNaN(amount)) { alert('Invalid amount'); return; }
     const date = new Date().toISOString().split('T')[0];
     await addCustomer({ name, amount: Number(amount), date, product_type: 'Cash Received' });
-    // Update daily sales
     await updateDailySales(date, Number(amount));
     loadCustomers();
     loadDashboardStats();
@@ -314,42 +351,37 @@ async function generateReports() {
 
     const customers = await getCustomers();
     const expenses = await getExpenses();
+    const workerPayments = await getWorkerPayments();
 
-    // Today's cash
     const todayCash = customers.filter(c => c.date === todayStr).reduce((sum, c) => sum + Number(c.amount), 0);
     document.getElementById('today-sales').textContent = 'R' + todayCash.toLocaleString();
 
-    // Weekly sales
     const weeklySales = customers.filter(c => c.date >= weekStart && c.date <= todayStr).reduce((sum, c) => sum + Number(c.amount), 0);
     document.getElementById('weekly-sales').textContent = 'R' + weeklySales.toLocaleString();
 
-    // Monthly sales
     const monthlySales = customers.filter(c => c.date >= monthStart && c.date <= todayStr).reduce((sum, c) => sum + Number(c.amount), 0);
     document.getElementById('monthly-sales').textContent = 'R' + monthlySales.toLocaleString();
 
-    // Weekly expenses
     const weeklyExp = expenses.filter(e => e.date >= weekStart && e.date <= todayStr).reduce((sum, e) => sum + Number(e.amount), 0);
     document.getElementById('weekly-expenses').textContent = 'R' + weeklyExp.toLocaleString();
 
-    // Monthly expenses
     const monthlyExp = expenses.filter(e => e.date >= monthStart && e.date <= todayStr).reduce((sum, e) => sum + Number(e.amount), 0);
     document.getElementById('monthly-expenses').textContent = 'R' + monthlyExp.toLocaleString();
 
-    // Cash in bank
-    const bankBalance = monthlySales - monthlyExp;
+    // Cash in bank after worker payments
+    const totalExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+    const totalWorkerPay = workerPayments.filter(p => p.month === today.toISOString().slice(0,7)).reduce((sum, p) => sum + Number(p.amount), 0);
+    const bankBalance = monthlySales - monthlyExp - totalWorkerPay;
     document.getElementById('bank-balance').textContent = 'R' + bankBalance.toLocaleString();
 
-    // Profit
-    const profit = monthlySales - monthlyExp;
+    const profit = monthlySales - monthlyExp - totalWorkerPay;
     const profitEl = document.getElementById('monthly-profit');
     profitEl.textContent = (profit >= 0 ? '+' : '') + 'R' + profit.toLocaleString();
     profitEl.style.color = profit >= 0 ? '#27ae60' : '#e74c3c';
 }
 
-// Bank balance display
 function showBankBalance() { showReports(); }
 
-// Settings
 function showSettings() { showScreen('settings-screen'); }
 
 async function changePIN() {
@@ -365,7 +397,7 @@ async function exportData() {
     const data = await exportAllData();
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = 'brickmanager-backup-' + new Date().toISOString().split('T')[0] + '.json'; a.click();
+    const a = document.createElement('a'); a.href = url; a.download = 'brickmanager-backup.json'; a.click();
     URL.revokeObjectURL(url);
     alert('Data exported!');
 }
@@ -382,7 +414,8 @@ function logout() { location.reload(); }
 async function updatePayDate() {
     const payDate = document.getElementById('pay-date').value;
     await setSetting('pay_date', payDate);
-    alert('Pay date updated!');
+    alert('Pay day updated to ' + payDate + 'th!');
+    showWorkers();
 }
 
 function setupTodayDate() {

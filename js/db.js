@@ -36,6 +36,11 @@ async function initDB() {
             if (!database.objectStoreNames.contains('settings')) {
                 database.createObjectStore('settings', { keyPath: 'key' });
             }
+            if (!database.objectStoreNames.contains('worker_payments')) {
+                const wp = database.createObjectStore('worker_payments', { keyPath: 'id', autoIncrement: true });
+                wp.createIndex('worker_id', 'worker_id', { unique: false });
+                wp.createIndex('month', 'month', { unique: false });
+            }
         };
     });
 }
@@ -142,6 +147,31 @@ async function updateDailySales(date, amount) {
         return update('daily_sales', { ...existing, amount: existing.amount + amount });
     }
     return add('daily_sales', { date, amount });
+}
+
+// Worker Payments
+async function getWorkerPayments() { return getAll('worker_payments'); }
+async function getWorkerPaymentsByMonth(month) {
+    const all = await getWorkerPayments();
+    return all.filter(p => p.month === month);
+}
+async function addWorkerPayment(data) { return add('worker_payments', data); }
+async function deleteWorkerPayment(id) { return remove('worker_payments', id); }
+
+// Get attendance for current pay period
+async function getAttendanceForPayPeriod(payDay) {
+    const today = new Date();
+    const currentDay = today.getDate();
+    
+    let startDate;
+    if (currentDay >= payDay) {
+        startDate = new Date(today.getFullYear(), today.getMonth(), payDay);
+    } else {
+        startDate = new Date(today.getFullYear(), today.getMonth() - 1, payDay);
+    }
+    
+    const all = await getAll('attendance');
+    return all.filter(a => new Date(a.date) >= startDate && a.status === 'present');
 }
 
 // Settings
