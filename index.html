@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BrickManager - Admin</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#2c3e50">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+</head>
+<body>
+    <div id="app">
+        <!-- PIN Screen -->
+        <div id="pin-screen" class="screen active">
+            <div class="pin-container">
+                <h1>BrickManager</h1>
+                <p id="pin-message">Enter your PIN</p>
+                <div class="pin-dots">
+                    <span class="dot"></span>
+                    <span class="dot"></span>
+                    <span class="dot"></span>
+                    <span class="dot"></span>
+                </div>
+                <div class="pin-keypad">
+                    <button class="key" data-key="1">1</button>
+                    <button class="key" data-key="2">2</button>
+                    <button class="key" data-key="3">3</button>
+                    <button class="key" data-key="4">4</button>
+                    <button class="key" data-key="5">5</button>
+                    <button class="key" data-key="6">6</button>
+                    <button class="key" data-key="7">7</button>
+                    <button class="key" data-key="8">8</button>
+                    <button class="key" data-key="9">9</button>
+                    <button class="key clear" data-key="clear">C</button>
+                    <button class="key" data-key="0">0</button>
+                    <button class="key enter" data-key="enter">OK</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Dashboard -->
+        <div id="dashboard-screen" class="screen">
+            <header>
+                <h1>BrickManager</h1>
+                <button class="menu-btn" onclick="toggleMenu()">☰</button>
+            </header>
+            <div class="menu-dropdown" id="menu-dropdown">
+                <button onclick="showSettings()">⚙️ Settings</button>
+                <button onclick="exportData()">💾 Export Data</button>
+                <button onclick="logout()">🚪 Logout</button>
+            </div>
+
+            <div class="dashboard-grid">
+                <div class="stat-card">
+                    <h3>Workers Present</h3>
+                    <p class="stat-number" id="workers-present">0</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Pending Deliveries</h3>
+                    <p class="stat-number" id="pending-deliveries">0</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Outstanding Payments</h3>
+                    <p class="stat-number" id="outstanding">0</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Petty Cash</h3>
+                    <p class="stat-number" id="petty-cash">$0</p>
+                </div>
+            </div>
+
+            <div class="quick-actions">
+                <h2>Quick Actions</h2>
+                <div class="actions-grid">
+                    <button class="action-btn" onclick="showAddWorker()">+ Worker</button>
+                    <button class="action-btn" onclick="showAddCustomer()">+ Customer</button>
+                    <button class="action-btn" onclick="showAttendance()">📅 Attendance</button>
+                    <button class="action-btn" onclick="showExpenses()">💰 Expense</button>
+                    <button class="action-btn" onclick="showReports()">📊 Reports</button>
+                    <button class="action-btn" onclick="showCustomers()">👥 Customers</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Workers Screen -->
+        <div id="workers-screen" class="screen">
+            <header>
+                <button class="back-btn" onclick="showDashboard()">← Back</button>
+                <h1>Workers</h1>
+                <button class="add-btn" onclick="showAddWorker()">+ Add</button>
+            </header>
+            <div class="content">
+                <div class="pay-date-section">
+                    <label>Pay Date (day of month):</label>
+                    <select id="pay-date" onchange="updatePayDate()">
+                        <option value="1">1st</option>
+                        <option value="15">15th</option>
+                        <option value="25">25th</option>
+                        <option value="30">30th</option>
+                    </select>
+                    <button class="secondary-btn" onclick="checkAttendanceReset()">Reset Attendance Now</button>
+                </div>
+                <div id="workers-list" class="list"></div>
+            </div>
+        </div>
+
+        <!-- Add/Edit Worker Modal -->
+        <div id="worker-modal" class="modal">
+            <div class="modal-content">
+                <h2 id="worker-modal-title">Add Worker</h2>
+                <input type="hidden" id="worker-id">
+                <input type="text" id="worker-name" placeholder="Worker Name">
+                <input type="text" id="worker-role" placeholder="Role (e.g., Mason, Driver)">
+                <div class="modal-actions">
+                    <button class="secondary-btn" onclick="closeModal('worker-modal')">Cancel</button>
+                    <button class="primary-btn" onclick="saveWorker()">Save</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Attendance Screen -->
+        <div id="attendance-screen" class="screen">
+            <header>
+                <button class="back-btn" onclick="showDashboard()">← Back</button>
+                <h1>Attendance</h1>
+            </header>
+            <div class="content">
+                <input type="date" id="attendance-date" onchange="loadAttendance()">
+                <div id="attendance-list" class="list"></div>
+                <button class="primary-btn full-width" onclick="saveAttendance()">Save Attendance</button>
+            </div>
+        </div>
+
+        <!-- Customers Screen -->
+        <div id="customers-screen" class="screen">
+            <header>
+                <button class="back-btn" onclick="showDashboard()">← Back</button>
+                <h1>Customers</h1>
+                <button class="add-btn" onclick="showAddCustomer()">+ Add</button>
+            </header>
+            <div class="content">
+                <div class="search-section">
+                    <input type="text" id="customer-search" placeholder="Search by name, date, or address..." oninput="searchCustomers()">
+                    <select id="customer-filter" onchange="filterCustomers()">
+                        <option value="all">All Customers</option>
+                        <option value="delivery">Delivery Pending</option>
+                        <option value="delivered">Delivery Done</option>
+                    </select>
+                </div>
+                <div id="customers-list" class="list"></div>
+            </div>
+        </div>
+
+        <!-- Add/Edit Customer Modal -->
+        <div id="customer-modal" class="modal">
+            <div class="modal-content">
+                <h2 id="customer-modal-title">Add Customer</h2>
+                <input type="hidden" id="customer-id">
+                <input type="text" id="customer-name" placeholder="Customer Name">
+                <select id="customer-product">
+                    <option value="">Select Product</option>
+                    <option value="Bricks">Bricks</option>
+                    <option value="Fine Sand">Fine Sand</option>
+                    <option value="Rough Sand">Rough Sand</option>
+                    <option value="Quarry">Quarry</option>
+                    <option value="TLB for Hire">TLB for Hire</option>
+                </select>
+                <input type="date" id="customer-payment-date" placeholder="Payment Date">
+                <input type="number" id="customer-amount" placeholder="Amount">
+                <div class="checkbox-group">
+                    <label>
+                        <input type="checkbox" id="customer-delivery" onchange="toggleDeliveryAddress()">
+                        Needs Delivery
+                    </label>
+                </div>
+                <input type="text" id="customer-address" placeholder="Delivery Address" style="display:none;">
+                <div class="modal-actions">
+                    <button class="secondary-btn" onclick="closeModal('customer-modal')">Cancel</button>
+                    <button class="primary-btn" onclick="saveCustomer()">Save</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Expenses Screen -->
+        <div id="expenses-screen" class="screen">
+            <header>
+                <button class="back-btn" onclick="showDashboard()">← Back</button>
+                <h1>Petty Cash</h1>
+                <button class="add-btn" onclick="showAddExpense()">+ Add</button>
+            </header>
+            <div class="content">
+                <div class="balance-card">
+                    <h3>Current Balance</h3>
+                    <p class="balance-amount" id="expense-balance">$0</p>
+                </div>
+                <div id="expenses-list" class="list"></div>
+            </div>
+        </div>
+
+        <!-- Add Expense Modal -->
+        <div id="expense-modal" class="modal">
+            <div class="modal-content">
+                <h2>Record Expense</h2>
+                <input type="text" id="expense-desc" placeholder="Description">
+                <input type="number" id="expense-amount" placeholder="Amount">
+                <input type="date" id="expense-date">
+                <div class="modal-actions">
+                    <button class="secondary-btn" onclick="closeModal('expense-modal')">Cancel</button>
+                    <button class="primary-btn" onclick="saveExpense()">Save</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reports Screen -->
+        <div id="reports-screen" class="screen">
+            <header>
+                <button class="back-btn" onclick="showDashboard()">← Back</button>
+                <h1>Reports</h1>
+            </header>
+            <div class="content">
+                <div class="report-section">
+                    <h3>Weekly Sales</h3>
+                    <p class="report-amount" id="weekly-sales">$0</p>
+                </div>
+                <div class="report-section">
+                    <h3>Monthly Sales</h3>
+                    <p class="report-amount" id="monthly-sales">$0</p>
+                </div>
+                <div class="report-section">
+                    <h3>Weekly Expenses</h3>
+                    <p class="report-amount" id="weekly-expenses">$0</p>
+                </div>
+                <div class="report-section">
+                    <h3>Monthly Expenses</h3>
+                    <p class="report-amount" id="monthly-expenses">$0</p>
+                </div>
+                <div class="report-section summary">
+                    <h3>Profit/Loss (This Month)</h3>
+                    <p class="report-amount" id="monthly-profit">$0</p>
+                </div>
+                <button class="primary-btn full-width" onclick="generateReports()">🔄 Refresh Reports</button>
+            </div>
+        </div>
+
+        <!-- Settings Screen -->
+        <div id="settings-screen" class="screen">
+            <header>
+                <button class="back-btn" onclick="showDashboard()">← Back</button>
+                <h1>Settings</h1>
+            </header>
+            <div class="content">
+                <button class="setting-btn" onclick="changePIN()">🔐 Change PIN</button>
+                <button class="setting-btn" onclick="exportData()">💾 Export Data</button>
+                <button class="setting-btn danger" onclick="clearAllData()">🗑️ Clear All Data</button>
+            </div>
+        </div>
+
+        <!-- Change PIN Modal -->
+        <div id="pin-change-modal" class="modal">
+            <div class="modal-content">
+                <h2>Change PIN</h2>
+                <input type="password" id="new-pin-1" placeholder="Enter new 4-digit PIN" maxlength="4">
+                <input type="password" id="new-pin-2" placeholder="Confirm new PIN" maxlength="4">
+                <div class="modal-actions">
+                    <button class="secondary-btn" onclick="closeModal('pin-change-modal')">Cancel</button>
+                    <button class="primary-btn" onclick="saveNewPIN()">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/db.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js');
+        }
+    </script>
+</body>
+</html>
