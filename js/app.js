@@ -243,7 +243,12 @@ async function loadCustomers() {
     const filter = document.getElementById('customer-filter')?.value || 'all';
     let filtered = customers;
     if (searchTerm) {
-        filtered = filtered.filter(c => c.name.toLowerCase().includes(searchTerm) || c.date.includes(searchTerm) || (c.address && c.address.toLowerCase().includes(searchTerm)));
+        filtered = filtered.filter(c => 
+            c.name.toLowerCase().includes(searchTerm) || 
+            c.date.includes(searchTerm) || 
+            (c.delivery_address && c.delivery_address.toLowerCase().includes(searchTerm)) ||
+            (c.product_type && c.product_type.toLowerCase().includes(searchTerm))
+        );
     }
     if (filter === 'delivery') filtered = filtered.filter(c => c.needs_delivery && c.delivery_status === 'pending');
     else if (filter === 'delivered') filtered = filtered.filter(c => c.delivery_status === 'delivered');
@@ -256,6 +261,7 @@ async function loadCustomers() {
             <div class="list-item-info">
                 <h4>${c.name} <span class="customer-product ${pc}">${c.product_type || 'Cash'}</span></h4>
                 <p>R${Number(c.amount).toLocaleString()} - ${c.date}</p>
+                ${c.delivery_address ? `<p>📍 ${c.delivery_address}</p>` : ''}
                 ${badge}
             </div>
             <div class="list-item-actions">
@@ -269,14 +275,34 @@ async function loadCustomers() {
 async function showAddCustomer() {
     const name = prompt('Customer Name:');
     if (!name) return;
-    const amount = prompt('Amount Received (R):');
+    
+    const products = ['Bricks', 'Fine Sand', 'Rough Sand', 'Quarry', 'TLB for Hire', 'Cash Received'];
+    let productType = prompt('Product: ' + products.join(', '));
+    if (!productType) return;
+    productType = products.find(p => p.toLowerCase() === productType.toLowerCase()) || productType;
+    
+    const amount = prompt('Amount (R):');
     if (!amount || isNaN(amount)) { alert('Invalid amount'); return; }
+    
+    const needsDelivery = confirm('Needs delivery? OK=Yes, Cancel=No');
+    const address = needsDelivery ? prompt('Delivery Address:') : '';
+    
     const date = new Date().toISOString().split('T')[0];
-    await addCustomer({ name, amount: Number(amount), date, product_type: 'Cash Received' });
+    
+    await addCustomer({ 
+        name, 
+        amount: Number(amount), 
+        date, 
+        product_type: productType,
+        needs_delivery: needsDelivery ? 1 : 0,
+        delivery_address: address || '',
+        delivery_status: needsDelivery ? 'pending' : 'none'
+    });
+    
     await updateDailySales(date, Number(amount));
     loadCustomers();
     loadDashboardStats();
-    alert('Cash recorded!');
+    alert('Customer recorded!');
 }
 
 async function toggleDelivery(id) {
