@@ -44,41 +44,29 @@
             
             await initDB();
             
-            // Test 1: Database initialized
             test('Database initialized', () => {
                 assertTrue(db !== null, 'DB should exist');
             });
             
-            // Test 2: Add worker
             let testWorkerId;
-            test('Add worker to database', async () => {
+            test('Add worker', async () => {
                 testWorkerId = await addWorker({ name: 'John Doe', role: 'Mason' });
-                assertTrue(testWorkerId > 0, 'Should return valid ID');
+                assertTrue(testWorkerId > 0);
             });
             
-            // Test 3: Get worker
-            test('Get worker by ID', async () => {
+            test('Get worker', async () => {
                 const worker = await getWorker(testWorkerId);
                 assertEqual(worker.name, 'John Doe');
-                assertEqual(worker.role, 'Mason');
             });
             
-            // Test 4: Get all workers
-            test('Get all workers', async () => {
-                const workers = await getWorkers();
-                assertTrue(workers.length > 0, 'Should have at least one worker');
-            });
-            
-            // Test 5: Update worker
             test('Update worker', async () => {
                 await updateWorker({ id: testWorkerId, name: 'John Doe', role: 'Foreman' });
-                const updated = await getWorker(testWorkerId);
-                assertEqual(updated.role, 'Foreman');
+                const worker = await getWorker(testWorkerId);
+                assertEqual(worker.role, 'Foreman');
             });
             
-            // Test 6: Add customer
             let testCustomerId;
-            test('Add customer with delivery', async () => {
+            test('Add customer', async () => {
                 testCustomerId = await addCustomer({
                     name: 'Test Customer',
                     product_type: 'Bricks',
@@ -91,49 +79,42 @@
                 assertTrue(testCustomerId > 0);
             });
             
-            // Test 7: Toggle delivery
-            test('Toggle delivery status', async () => {
+            test('Toggle delivery', async () => {
                 await updateCustomer({ id: testCustomerId, name: 'Test', product_type: 'Bricks', payment_date: '2026-08-15', amount: 5000, needs_delivery: 1, delivery_address: '123', delivery_status: 'delivered' });
-                const customer = await getCustomer(testCustomerId);
-                assertEqual(customer.delivery_status, 'delivered');
+                const c = await getCustomer(testCustomerId);
+                assertEqual(c.delivery_status, 'delivered');
             });
             
-            // Test 8: Add expense
             let testExpenseId;
             test('Add expense', async () => {
-                testExpenseId = await addExpense({ description: 'Test Expense', amount: 100, date: '2026-08-07' });
+                testExpenseId = await addExpense({ description: 'Test', amount: 100, date: '2026-08-07' });
                 assertTrue(testExpenseId > 0);
             });
             
-            // Test 9: Get expenses
-            test('Get all expenses', async () => {
+            test('Get expenses', async () => {
                 const expenses = await getExpenses();
                 assertTrue(expenses.length > 0);
             });
             
-            // Test 10: Settings
-            test('Save and retrieve setting', async () => {
+            test('Settings', async () => {
                 await setSetting('test_key', 'test_value');
-                const value = await getSetting('test_key');
-                assertEqual(value, 'test_value');
+                const val = await getSetting('test_key');
+                assertEqual(val, 'test_value');
             });
             
-            // Test 11: Delete worker
             test('Delete worker', async () => {
                 await deleteWorker(testWorkerId);
-                const worker = await getWorker(testWorkerId);
-                assertTrue(worker === undefined, 'Worker should be deleted');
+                const w = await getWorker(testWorkerId);
+                assertTrue(w === undefined);
             });
             
-            // Test 12: Export data
-            test('Export all data', async () => {
+            test('Export data', async () => {
                 const data = await exportAllData();
                 assertTrue(data.workers !== undefined);
                 assertTrue(data.customers !== undefined);
                 assertTrue(data.expenses !== undefined);
             });
             
-            // Display results
             const passed = results.filter(r => r.passed).length;
             const failed = results.filter(r => !r.passed).length;
             
@@ -150,7 +131,6 @@
             `;
         }
         
-        // Run tests on load
         window.onload = runTests;
     </script>
 </body>

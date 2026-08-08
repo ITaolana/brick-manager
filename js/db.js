@@ -1,30 +1,9 @@
-// IndexedDB + Firebase Sync for BrickManager
-// Offline-first with real-time sync
+// IndexedDB Database for BrickManager
+// Local-only storage (no Firebase)
 
 const DB_NAME = 'BrickManagerDB';
 const DB_VERSION = 1;
 let db = null;
-let firestore = null;
-let firebaseSyncing = false;
-
-// Firebase config - load from server or environment
-// For production, use a backend to proxy requests
-let firebaseConfig = null;
-
-async function loadFirebaseConfig() {
-    // Try to load from localStorage (set after admin configures)
-    const stored = localStorage.getItem('firebaseConfig');
-    if (stored) {
-        return JSON.parse(stored);
-    }
-    return null;
-}
-
-async function configureFirebase(config) {
-    firebaseConfig = config;
-    localStorage.setItem('firebaseConfig', JSON.stringify(config));
-    await initFirebase();
-}
 
 // Initialize Database
 async function initDB() {
@@ -70,32 +49,7 @@ async function initDB() {
     });
 }
 
-// Initialize Firebase
-async function initFirebase() {
-    if (!firebaseConfig) {
-        const config = await loadFirebaseConfig();
-        if (!config) {
-            console.log('Firebase not configured - running in offline mode');
-            return;
-        }
-        firebaseConfig = config;
-    }
-    
-    try {
-        firebase.initializeApp(firebaseConfig);
-        firestore = firebase.firestore();
-        
-        // Enable offline persistence
-        await firestore.enablePersistence({ synchronizeTabs: true });
-        
-        console.log('Firebase initialized with offline persistence');
-        startFirebaseSync();
-    } catch (e) {
-        console.log('Firebase init failed (may be offline):', e.message);
-    }
-}
-
-// Generic CRUD - Local IndexedDB
+// Generic CRUD
 function getAll(storeName) {
     return new Promise((resolve, reject) => {
         const tx = db.transaction(storeName, 'readonly');
@@ -122,10 +76,7 @@ function add(storeName, data) {
         const store = tx.objectStore(storeName);
         data.created_at = new Date().toISOString();
         const request = store.add(data);
-        request.onsuccess = () => {
-            resolve(request.result);
-            syncToFirebase(storeName);
-        };
+        request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error);
     });
 }
@@ -135,10 +86,7 @@ function update(storeName, data) {
         const tx = db.transaction(storeName, 'readwrite');
         const store = tx.objectStore(storeName);
         const request = store.put(data);
-        request.onsuccess = () => {
-            resolve(request.result);
-            syncToFirebase(storeName);
-        };
+        request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error);
     });
 }
@@ -148,113 +96,17 @@ function remove(storeName, id) {
         const tx = db.transaction(storeName, 'readwrite');
         const store = tx.objectStore(storeName);
         const request = store.delete(Number(id));
-        request.onsuccess = () => {
-            resolve();
-            syncToFirebase(storeName);
-        };
+        request.onsuccess = () => resolve();
         request.onerror = () => reject(request.error);
     });
 }
 
-// Firebase Sync
-async function syncToFirebase(storeName) {
-    if (!firestore || firebaseSyncing) return;
-    
-    try {
-        const items = await getAll(storeName);
-        const docRef = firestore.collection(storeName).doc('data');
-        await docRef.set({ items, lastSync: new Date().toISOString() });
-    } catch (e) {
-        console.log('Sync failed:', e.message);
-    }
-}
-
-async function syncFromFirebase(storeName) {
-    if (!firestore || firebaseSyncing) return;
-    
-    try {
-        const doc = await firestore.collection(storeName).doc('data').get();
-        if (doc.exists) {
-            const data = doc.data();
-            if (data.items) {
-                // Merge with local
-                const localItems = await getAll(storeName);
-                const localIds = new Set(localItems.map(i => i.id));
-                
-                const tx = db.transaction(storeName, 'readwrite');
-                const store = tx.objectStore(storeName);
-                
-                for (const item of data.items) {
-                    if (!localIds.has(item.id)) {
-                        store.put(item);
-                    }
-                }
-                console.log(`Synced ${storeName} from Firebase`);
-            }
-        }
-    } catch (e) {
-        console.log('Sync from Firebase failed:', e.message);
-    }
-}
-
-function startFirebaseSync() {
-    if (!firestore) return;
-    
-    // Sync all stores on load
-    ['workers', 'customers', 'expenses', 'settings'].forEach(store => {
-        syncFromFirebase(store);
-        
-        // Listen for real-time changes
-        firestore.collection(store).doc('data').onSnapshot((doc) => {
-            if (doc.exists && !firebaseSyncing) {
-                firebaseSyncing = true;
-                const data = doc.data();
-                if (data.items) {
-                    mergeFromFirebase(store, data.items);
-                }
-                setTimeout(() => firebaseSyncing = false, 1000);
-            }
-        });
-    });
-}
-
-async function mergeFromFirebase(storeName, firebaseItems) {
-    const localItems = await getAll(storeName);
-    const localMap = new Map(localItems.map(i => [i.id, i]));
-    
-    const tx = db.transaction(storeName, 'readwrite');
-    const store = tx.objectStore(storeName);
-    
-    for (const item of firebaseItems) {
-        const local = localMap.get(item.id);
-        if (!local || new Date(item.updated_at || 0) > new Date(local.updated_at || 0)) {
-            store.put(item);
-        }
-    }
-}
-
 // Workers
-async function getWorkers() {
-    return getAll('workers');
-}
-
-async function getWorker(id) {
-    return getById('workers', id);
-}
-
-async function addWorker(data) {
-    data.updated_at = new Date().toISOString();
-    return add('workers', data);
-}
-
-async function updateWorker(data) {
-    data.updated_at = new Date().toISOString();
-    return update('workers', data);
-}
-
-async function deleteWorker(id) {
-    return remove('workers', id);
-}
+async function getWorkers() { return getAll('workers'); }
+async function getWorker(id) { return getById('workers', id); }
+async function addWorker(data) { return add('workers', data); }
+async function updateWorker(data) { return update('workers', data); }
+async function deleteWorker(id) { return remove('workers', id); }
 
 // Attendance
 async function getAttendanceByDate(date) {
@@ -270,60 +122,32 @@ async function getAttendanceByWorkerAndDate(workerId, date) {
 async function saveAttendance(workerId, date, status) {
     const existing = await getAttendanceByWorkerAndDate(workerId, date);
     if (existing) {
-        return update('attendance', { ...existing, status, updated_at: new Date().toISOString() });
+        return update('attendance', { ...existing, status });
     } else {
-        return add('attendance', { worker_id: workerId, date, status, updated_at: new Date().toISOString() });
+        return add('attendance', { worker_id: workerId, date, status });
     }
 }
 
-async function getAllAttendance() {
-    return getAll('attendance');
-}
+async function getAllAttendance() { return getAll('attendance'); }
 
 async function deleteAllAttendance() {
     const all = await getAll('attendance');
     for (const item of all) {
         await remove('attendance', item.id);
     }
-    syncToFirebase('attendance');
 }
 
 // Customers
-async function getCustomers() {
-    return getAll('customers');
-}
-
-async function getCustomer(id) {
-    return getById('customers', id);
-}
-
-async function addCustomer(data) {
-    data.updated_at = new Date().toISOString();
-    return add('customers', data);
-}
-
-async function updateCustomer(data) {
-    data.updated_at = new Date().toISOString();
-    return update('customers', data);
-}
-
-async function deleteCustomer(id) {
-    return remove('customers', id);
-}
+async function getCustomers() { return getAll('customers'); }
+async function getCustomer(id) { return getById('customers', id); }
+async function addCustomer(data) { return add('customers', data); }
+async function updateCustomer(data) { return update('customers', data); }
+async function deleteCustomer(id) { return remove('customers', id); }
 
 // Expenses
-async function getExpenses() {
-    return getAll('expenses');
-}
-
-async function addExpense(data) {
-    data.updated_at = new Date().toISOString();
-    return add('expenses', data);
-}
-
-async function deleteExpense(id) {
-    return remove('expenses', id);
-}
+async function getExpenses() { return getAll('expenses'); }
+async function addExpense(data) { return add('expenses', data); }
+async function deleteExpense(id) { return remove('expenses', id); }
 
 // Settings
 async function getSetting(key) {
@@ -332,7 +156,7 @@ async function getSetting(key) {
 }
 
 async function setSetting(key, value) {
-    return update('settings', { key, value, updated_at: new Date().toISOString() });
+    return update('settings', { key, value });
 }
 
 // Clear all
@@ -344,11 +168,6 @@ async function clearAllData() {
             await remove(store, item.id);
         }
     }
-    if (firestore) {
-        for (const store of stores) {
-            await firestore.collection(store).doc('data').delete();
-        }
-    }
 }
 
 // Export
@@ -358,7 +177,6 @@ async function exportAllData() {
     const customers = await getCustomers();
     const expenses = await getExpenses();
     const payDate = await getSetting('pay_date');
-    const pin = await getSetting('pin');
 
     return {
         exportDate: new Date().toISOString(),
@@ -366,7 +184,7 @@ async function exportAllData() {
         attendance,
         customers,
         expenses,
-        settings: { pay_date: payDate, pin_hash: pin ? '***' : null }
+        settings: { pay_date: payDate }
     };
 }
 
@@ -380,4 +198,4 @@ async function checkAndResetAttendance() {
     }
 }
 
-console.log('Database module loaded with Firebase sync');
+console.log('Database module loaded');

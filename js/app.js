@@ -1,22 +1,11 @@
 // BrickManager - Main Application Logic
 let currentPIN = '';
-let pinMode = 'enter'; // 'enter', 'setup', 'change'
+let pinMode = 'enter'; // 'enter', 'setup'
 let enteredWorkers = [];
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', async () => {
     await initDB();
-    
-    // Check if Firebase is configured, if not show config screen
-    const storedConfig = localStorage.getItem('firebaseConfig');
-    const skipped = localStorage.getItem('firebaseSkipped');
-    
-    if (!storedConfig && !skipped) {
-        showScreen('config-screen');
-        return;
-    }
-    
-    await initFirebase();
     await checkPINSetup();
     setupPINKeypad();
     setupTodayDate();
@@ -73,20 +62,8 @@ async function validatePIN() {
             updatePINDots();
             showScreen('dashboard-screen');
             initDashboard();
-        }
-    } else if (pinMode === 'change') {
-        const pin1 = document.getElementById('new-pin-1').value;
-        const pin2 = document.getElementById('new-pin-2').value;
-        
-        if (pin1 === pin2 && pin1.length === 4) {
-            await setSetting('pin', pin1);
-            closeModal('pin-change-modal');
-            alert('PIN changed successfully!');
-            pinMode = 'enter';
-            currentPIN = '';
-            updatePINDots();
         } else {
-            alert('PINs do not match or invalid!');
+            alert('PIN must be 4 digits');
         }
     } else {
         const storedPIN = await getSetting('pin');
@@ -146,59 +123,46 @@ function showDashboard() {
 
 // Workers
 async function showAddWorker(editId = null) {
-    if (editId) {
-        const worker = await getWorker(editId);
-        document.getElementById('worker-modal-title').textContent = 'Edit Worker';
-        document.getElementById('worker-id').value = worker.id;
-        document.getElementById('worker-name').value = worker.name;
-        document.getElementById('worker-role').value = worker.role;
-    } else {
-        document.getElementById('worker-modal-title').textContent = 'Add Worker';
-        document.getElementById('worker-id').value = '';
-        document.getElementById('worker-name').value = '';
-        document.getElementById('worker-role').value = '';
-    }
-    showModal('worker-modal');
-}
-
-async function saveWorker() {
-    const id = document.getElementById('worker-id').value;
-    const name = document.getElementById('worker-name').value;
-    const role = document.getElementById('worker-role').value;
-
-    if (!name) {
-        alert('Please enter worker name');
-        return;
-    }
-
-    if (id) {
-        await updateWorker({ id: Number(id), name, role });
-    } else {
-        await addWorker({ name, role });
-    }
-
-    closeModal('worker-modal');
+    showScreen('workers-screen');
     loadWorkers();
 }
 
 async function loadWorkers() {
     const workers = await getWorkers();
     const list = document.getElementById('workers-list');
-    list.innerHTML = workers.map(w => `
-        <div class="list-item">
-            <div class="list-item-info">
-                <h4>${w.name}</h4>
-                <p>${w.role}</p>
+    if (!list) return;
+    
+    list.innerHTML = workers.length === 0 ? '<p style="text-align:center;color:gray;">No workers added yet</p>' : 
+        workers.map(w => `
+            <div class="list-item">
+                <div class="list-item-info">
+                    <h4>${w.name}</h4>
+                    <p>${w.role}</p>
+                </div>
+                <div class="list-item-actions">
+                    <button class="edit-btn" onclick="editWorker(${w.id})">Edit</button>
+                    <button class="delete-btn" onclick="deleteWorkerRecord(${w.id})">Delete</button>
+                </div>
             </div>
-            <div class="list-item-actions">
-                <button class="edit-btn" onclick="showAddWorker(${w.id})">Edit</button>
-                <button class="delete-btn" onclick="deleteWorker(${w.id})">Delete</button>
-            </div>
-        </div>
-    `).join('');
+        `).join('');
 }
 
-async function deleteWorker(id) {
+async function editWorker(id) {
+    const worker = await getWorker(id);
+    const name = prompt('Worker Name:', worker?.name || '');
+    const role = prompt('Role:', worker?.role || '');
+    
+    if (name) {
+        if (worker) {
+            await updateWorker({ ...worker, name, role });
+        } else {
+            await addWorker({ name, role });
+        }
+        loadWorkers();
+    }
+}
+
+async function deleteWorkerRecord(id) {
     if (confirm('Delete this worker?')) {
         await deleteWorker(id);
         loadWorkers();
@@ -211,7 +175,7 @@ async function updatePayDate() {
 }
 
 async function checkAttendanceReset() {
-    if (confirm('Reset all attendance records? This happens automatically on pay date.')) {
+    if (confirm('Reset all attendance records?')) {
         await deleteAllAttendance();
         alert('Attendance records cleared');
     }
@@ -222,7 +186,7 @@ async function showAttendance() {
     showScreen('attendance-screen');
     const payDate = await getSetting('pay_date') || '25';
     document.getElementById('pay-date').value = payDate;
-    loadWorkersForAttendance();
+    await loadWorkersForAttendance();
     loadAttendance();
 }
 
@@ -234,8 +198,8 @@ async function loadWorkersForAttendance() {
 async function loadAttendance() {
     const date = document.getElementById('attendance-date').value || new Date().toISOString().split('T')[0];
     const attendance = await getAttendanceByDate(date);
-    
     const list = document.getElementById('attendance-list');
+    if (!list) return;
     
     if (enteredWorkers.length === 0) {
         list.innerHTML = '<p style="text-align:center;color:gray;">No workers added yet</p>';
@@ -277,16 +241,7 @@ async function saveAttendance() {
     }
     
     alert('Attendance saved!');
-    loadAttendance();
-}
-
-function setupTodayDate() {
-    const today = new Date().toISOString().split('T')[0];
-    const dateInputs = document.querySelectorAll('input[type="date"]');
-    dateInputs.forEach(input => {
-        if (!input.value) input.value = today;
-    });
-    document.getElementById('attendance-date').value = today;
+    loadDashboardStats();
 }
 
 // Customers
@@ -295,82 +250,13 @@ async function showCustomers() {
     loadCustomers();
 }
 
-async function showAddCustomer(editId = null) {
-    if (editId) {
-        const customer = await getCustomer(editId);
-        document.getElementById('customer-modal-title').textContent = 'Edit Customer';
-        document.getElementById('customer-id').value = customer.id;
-        document.getElementById('customer-name').value = customer.name;
-        document.getElementById('customer-product').value = customer.product_type;
-        document.getElementById('customer-payment-date').value = customer.payment_date;
-        document.getElementById('customer-amount').value = customer.amount;
-        document.getElementById('customer-delivery').checked = customer.needs_delivery;
-        document.getElementById('customer-address').value = customer.delivery_address || '';
-        toggleDeliveryAddress();
-    } else {
-        document.getElementById('customer-modal-title').textContent = 'Add Customer';
-        document.getElementById('customer-id').value = '';
-        document.getElementById('customer-name').value = '';
-        document.getElementById('customer-product').value = '';
-        document.getElementById('customer-payment-date').value = '';
-        document.getElementById('customer-amount').value = '';
-        document.getElementById('customer-delivery').checked = false;
-        document.getElementById('customer-address').value = '';
-    }
-    showModal('customer-modal');
-}
-
-function toggleDeliveryAddress() {
-    const needsDelivery = document.getElementById('customer-delivery').checked;
-    document.getElementById('customer-address').style.display = needsDelivery ? 'block' : 'none';
-}
-
-async function saveCustomer() {
-    const id = document.getElementById('customer-id').value;
-    const name = document.getElementById('customer-name').value;
-    const productType = document.getElementById('customer-product').value;
-    const paymentDate = document.getElementById('customer-payment-date').value;
-    const amount = document.getElementById('customer-amount').value;
-    const needsDelivery = document.getElementById('customer-delivery').checked;
-    const deliveryAddress = document.getElementById('customer-address').value;
-
-    if (!name || !productType || !paymentDate || !amount) {
-        alert('Please fill all required fields');
-        return;
-    }
-
-    const data = {
-        name,
-        product_type: productType,
-        payment_date: paymentDate,
-        amount: Number(amount),
-        needs_delivery: needsDelivery ? 1 : 0,
-        delivery_address: deliveryAddress,
-        delivery_status: needsDelivery ? 'pending' : 'none'
-    };
-
-    if (id) {
-        const existing = await getCustomer(id);
-        data.id = Number(id);
-        data.delivery_status = existing.delivery_status;
-        await updateCustomer(data);
-    } else {
-        await addCustomer(data);
-    }
-
-    closeModal('customer-modal');
-    loadCustomers();
-    loadDashboardStats();
-}
-
 async function loadCustomers() {
     const customers = await getCustomers();
-    const searchTerm = document.getElementById('customer-search').value.toLowerCase();
-    const filter = document.getElementById('customer-filter').value;
+    const searchTerm = document.getElementById('customer-search')?.value.toLowerCase() || '';
+    const filter = document.getElementById('customer-filter')?.value || 'all';
 
     let filtered = customers;
 
-    // Search
     if (searchTerm) {
         filtered = filtered.filter(c => 
             c.name.toLowerCase().includes(searchTerm) ||
@@ -379,7 +265,6 @@ async function loadCustomers() {
         );
     }
 
-    // Filter
     if (filter === 'delivery') {
         filtered = filtered.filter(c => c.needs_delivery && c.delivery_status === 'pending');
     } else if (filter === 'delivered') {
@@ -387,6 +272,8 @@ async function loadCustomers() {
     }
 
     const list = document.getElementById('customers-list');
+    if (!list) return;
+    
     list.innerHTML = filtered.map(c => {
         const productClass = 'product-' + c.product_type.toLowerCase().replace(/\s+/g, '-');
         const deliveryBadge = c.needs_delivery 
@@ -403,12 +290,39 @@ async function loadCustomers() {
                 </div>
                 <div class="list-item-actions">
                     ${c.needs_delivery ? `<button class="deliver-btn" onclick="toggleDelivery(${c.id})">${c.delivery_status === 'delivered' ? 'Undo' : 'Deliver'}</button>` : ''}
-                    <button class="edit-btn" onclick="showAddCustomer(${c.id})">Edit</button>
+                    <button class="edit-btn" onclick="editCustomer(${c.id})">Edit</button>
                     <button class="delete-btn" onclick="deleteCustomerRecord(${c.id})">Delete</button>
                 </div>
             </div>
         `;
     }).join('');
+}
+
+async function editCustomer(id) {
+    const customer = await getCustomer(id);
+    
+    const name = prompt('Customer Name:', customer?.name || '');
+    const products = ['Bricks', 'Fine Sand', 'Rough Sand', 'Quarry', 'TLB for Hire'];
+    const productType = prompt('Product (' + products.join(', ') + '):', customer?.product_type || '');
+    const paymentDate = prompt('Payment Date (YYYY-MM-DD):', customer?.payment_date || '');
+    const amount = prompt('Amount:', customer?.amount || '');
+    const needsDelivery = confirm('Needs delivery?');
+    const address = needsDelivery ? prompt('Delivery Address:', customer?.delivery_address || '') : '';
+    
+    if (name && productType && paymentDate && amount) {
+        await updateCustomer({
+            id: Number(id),
+            name,
+            product_type: productType,
+            payment_date: paymentDate,
+            amount: Number(amount),
+            needs_delivery: needsDelivery ? 1 : 0,
+            delivery_address: address,
+            delivery_status: needsDelivery ? 'pending' : 'none'
+        });
+        loadCustomers();
+        loadDashboardStats();
+    }
 }
 
 async function toggleDelivery(id) {
@@ -427,12 +341,37 @@ async function deleteCustomerRecord(id) {
     }
 }
 
-function searchCustomers() {
+// Add Customer
+async function showAddCustomer() {
+    const name = prompt('Customer Name:');
+    if (!name) return;
+    
+    const products = ['Bricks', 'Fine Sand', 'Rough Sand', 'Quarry', 'TLB for Hire'];
+    const productType = prompt('Product (' + products.join(', ') + '):');
+    if (!productType) return;
+    
+    const paymentDate = prompt('Payment Date (YYYY-MM-DD):');
+    if (!paymentDate) return;
+    
+    const amount = prompt('Amount:');
+    if (!amount) return;
+    
+    const needsDelivery = confirm('Needs delivery?');
+    const address = needsDelivery ? prompt('Delivery Address:') : '';
+    
+    await addCustomer({
+        name,
+        product_type: productType,
+        payment_date: paymentDate,
+        amount: Number(amount),
+        needs_delivery: needsDelivery ? 1 : 0,
+        delivery_address: address,
+        delivery_status: needsDelivery ? 'pending' : 'none'
+    });
+    
     loadCustomers();
-}
-
-function filterCustomers() {
-    loadCustomers();
+    loadDashboardStats();
+    alert('Customer added!');
 }
 
 // Expenses
@@ -442,35 +381,30 @@ async function showExpenses() {
 }
 
 async function showAddExpense() {
-    document.getElementById('expense-desc').value = '';
-    document.getElementById('expense-amount').value = '';
-    document.getElementById('expense-date').value = new Date().toISOString().split('T')[0];
-    showModal('expense-modal');
-}
-
-async function saveExpense() {
-    const desc = document.getElementById('expense-desc').value;
-    const amount = document.getElementById('expense-amount').value;
-    const date = document.getElementById('expense-date').value;
-
-    if (!desc || !amount || !date) {
-        alert('Please fill all fields');
-        return;
-    }
-
+    const desc = prompt('Description:');
+    if (!desc) return;
+    
+    const amount = prompt('Amount:');
+    if (!amount) return;
+    
+    const date = new Date().toISOString().split('T')[0];
+    
     await addExpense({ description: desc, amount: Number(amount), date });
-    closeModal('expense-modal');
     loadExpenses();
     loadDashboardStats();
+    alert('Expense recorded!');
 }
 
 async function loadExpenses() {
     const expenses = await getExpenses();
     const total = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
     
-    document.getElementById('expense-balance').textContent = '$' + total.toLocaleString();
+    const balanceEl = document.getElementById('expense-balance');
+    if (balanceEl) balanceEl.textContent = '$' + total.toLocaleString();
 
     const list = document.getElementById('expenses-list');
+    if (!list) return;
+    
     list.innerHTML = expenses
         .sort((a, b) => new Date(b.date) - new Date(a.date))
         .map(e => `
@@ -481,13 +415,13 @@ async function loadExpenses() {
                 </div>
                 <div class="list-item-actions">
                     <span style="font-weight:bold;color:var(--danger)">-$${Number(e.amount).toLocaleString()}</span>
-                    <button class="delete-btn" onclick="deleteExpense(${e.id})">Delete</button>
+                    <button class="delete-btn" onclick="deleteExpenseRecord(${e.id})">Delete</button>
                 </div>
             </div>
         `).join('');
 }
 
-async function deleteExpense(id) {
+async function deleteExpenseRecord(id) {
     if (confirm('Delete this expense?')) {
         await deleteExpense(id);
         loadExpenses();
@@ -530,15 +464,18 @@ async function generateReports() {
         .filter(e => e.date >= monthStartStr && e.date <= todayStr)
         .reduce((sum, e) => sum + Number(e.amount), 0);
 
-    document.getElementById('weekly-sales').textContent = '$' + weeklySales.toLocaleString();
-    document.getElementById('monthly-sales').textContent = '$' + monthlySales.toLocaleString();
-    document.getElementById('weekly-expenses').textContent = '$' + weeklyExp.toLocaleString();
-    document.getElementById('monthly-expenses').textContent = '$' + monthlyExp.toLocaleString();
+    const el = id => document.getElementById(id);
+    if (el('weekly-sales')) el('weekly-sales').textContent = '$' + weeklySales.toLocaleString();
+    if (el('monthly-sales')) el('monthly-sales').textContent = '$' + monthlySales.toLocaleString();
+    if (el('weekly-expenses')) el('weekly-expenses').textContent = '$' + weeklyExp.toLocaleString();
+    if (el('monthly-expenses')) el('monthly-expenses').textContent = '$' + monthlyExp.toLocaleString();
 
     const profit = monthlySales - monthlyExp;
     const profitEl = document.getElementById('monthly-profit');
-    profitEl.textContent = (profit >= 0 ? '+' : '') + '$' + profit.toLocaleString();
-    profitEl.style.color = profit >= 0 ? '#27ae60' : '#e74c3c';
+    if (profitEl) {
+        profitEl.textContent = (profit >= 0 ? '+' : '') + '$' + profit.toLocaleString();
+        profitEl.style.color = profit >= 0 ? '#27ae60' : '#e74c3c';
+    }
 }
 
 // Settings
@@ -546,15 +483,22 @@ function showSettings() {
     showScreen('settings-screen');
 }
 
-function changePIN() {
-    document.getElementById('new-pin-1').value = '';
-    document.getElementById('new-pin-2').value = '';
-    showModal('pin-change-modal');
-    pinMode = 'change';
-}
-
-function saveNewPIN() {
-    validatePIN();
+async function changePIN() {
+    const currentPIN = prompt('Enter current PIN:');
+    const stored = await getSetting('pin');
+    
+    if (currentPIN !== stored) {
+        alert('Incorrect PIN');
+        return;
+    }
+    
+    const newPIN = prompt('Enter new 4-digit PIN:');
+    if (newPIN && newPIN.length === 4) {
+        await setSetting('pin', newPIN);
+        alert('PIN changed!');
+    } else {
+        alert('PIN must be 4 digits');
+    }
 }
 
 async function exportData() {
@@ -569,11 +513,11 @@ async function exportData() {
     alert('Data exported!');
 }
 
-async function clearAllData() {
-    if (confirm('WARNING: This will delete ALL data. Are you sure?')) {
-        if (confirm('This cannot be undone. Really delete everything?')) {
+async function resetApp() {
+    if (confirm('This will delete ALL data. Continue?')) {
+        if (confirm('Really delete everything? This cannot be undone.')) {
             await clearAllData();
-            alert('All data cleared');
+            alert('All data cleared. Refreshing...');
             location.reload();
         }
     }
@@ -583,49 +527,14 @@ function logout() {
     location.reload();
 }
 
-async function resetPIN() {
-    if (confirm('This will clear your PIN and all data. Are you sure?')) {
-        if (confirm('All data will be lost. Continue?')) {
-            await clearAllData();
-            localStorage.clear();
-            alert('App reset! Refresh to set new PIN.');
-            location.reload();
-        }
-    }
-}
-
-async function saveFirebaseConfig() {
-    const config = {
-        apiKey: document.getElementById('config-apiKey').value,
-        authDomain: document.getElementById('config-authDomain').value,
-        projectId: document.getElementById('config-projectId').value,
-        storageBucket: document.getElementById('config-storageBucket').value,
-        messagingSenderId: document.getElementById('config-messagingSenderId').value,
-        appId: document.getElementById('config-appId').value
-    };
-    
-    if (!config.apiKey || !config.projectId) {
-        alert('Please enter at least apiKey and projectId');
-        return;
-    }
-    
-    localStorage.setItem('firebaseConfig', JSON.stringify(config));
-    await initFirebase();
-    showScreen('pin-screen');
-}
-
-function skipConfig() {
-    localStorage.setItem('firebaseSkipped', 'true');
-    showScreen('pin-screen');
-}
-
-// Modal helpers
-function showModal(modalId) {
-    document.getElementById(modalId).classList.add('show');
-}
-
-function closeModal(modalId) {
-    document.getElementById(modalId).classList.remove('show');
+function setupTodayDate() {
+    const today = new Date().toISOString().split('T')[0];
+    const dateInputs = document.querySelectorAll('input[type="date"]');
+    dateInputs.forEach(input => {
+        if (!input.value) input.value = today;
+    });
+    const attDate = document.getElementById('attendance-date');
+    if (attDate) attDate.value = today;
 }
 
 // Close modals on outside click
@@ -635,11 +544,6 @@ document.querySelectorAll('.modal').forEach(modal => {
             modal.classList.remove('show');
         }
     });
-});
-
-// Initialize workers screen properly
-document.getElementById('workers-screen').addEventListener('click', function() {
-    loadWorkers();
 });
 
 console.log('App module loaded');

@@ -6,8 +6,6 @@
     <title>BrickManager - Admin</title>
     <link rel="stylesheet" href="css/style.css">
     <link rel="manifest" href="manifest.json">
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     <meta name="theme-color" content="#2c3e50">
     <meta name="apple-mobile-web-app-capable" content="yes">
 </head>
@@ -38,25 +36,6 @@
                     <button class="key clear" data-key="clear">C</button>
                     <button class="key" data-key="0">0</button>
                     <button class="key enter" data-key="enter">OK</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Config Screen (shows if Firebase not configured) -->
-        <div id="config-screen" class="screen">
-            <div class="pin-container">
-                <h1>BrickManager Setup</h1>
-                <p style="color:#fff;margin-bottom:20px;">Configure Firebase to sync between admins</p>
-                <div style="background:rgba(255,255,255,0.1);padding:20px;border-radius:12px;max-width:350px;">
-                    <p style="color:#fff;margin-bottom:15px;font-size:0.9rem;">Enter Firebase Config (from Firebase Console → Project Settings → Your apps → Web app):</p>
-                    <input type="text" id="config-apiKey" placeholder="apiKey" style="margin-bottom:10px;">
-                    <input type="text" id="config-authDomain" placeholder="authDomain" style="margin-bottom:10px;">
-                    <input type="text" id="config-projectId" placeholder="projectId" style="margin-bottom:10px;">
-                    <input type="text" id="config-storageBucket" placeholder="storageBucket" style="margin-bottom:10px;">
-                    <input type="text" id="config-messagingSenderId" placeholder="messagingSenderId" style="margin-bottom:10px;">
-                    <input type="text" id="config-appId" placeholder="appId" style="margin-bottom:10px;">
-                    <button class="primary-btn" style="width:100%;margin-top:10px;" onclick="saveFirebaseConfig()">Save & Continue</button>
-                    <button class="secondary-btn" style="width:100%;margin-top:10px;" onclick="skipConfig()">Skip (Offline Only)</button>
                 </div>
             </div>
         </div>
