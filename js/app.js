@@ -139,6 +139,19 @@ function showDashboard() {
     loadDashboardStats();
 }
 
+function showCustomersDelivery() {
+    showScreen('customers-screen');
+    document.getElementById('customer-filter').value = 'delivery';
+    loadCustomers();
+}
+
+function showCustomersOutstanding() {
+    showScreen('customers-screen');
+    document.getElementById('customer-search').value = '';
+    document.getElementById('customer-filter').value = 'all';
+    loadCustomers();
+}
+
 // Workers
 async function showAddWorker() {
     const name = prompt('Worker Name:');
@@ -255,10 +268,14 @@ let currentAttendance = {};
 
 async function markAttendance(workerId, status) {
     currentAttendance[workerId] = status;
+    const date = document.getElementById('attendance-date').value || new Date().toISOString().split('T')[0];
+    await saveAttendance(workerId, date, status);
     loadAttendance();
+    loadDashboardStats();
+    alert(status === 'present' ? 'Marked Present' : 'Marked Absent');
 }
 
-async function saveAttendance() {
+async function saveAllAttendance() {
     const date = document.getElementById('attendance-date').value || new Date().toISOString().split('T')[0];
     
     for (const [workerId, status] of Object.entries(currentAttendance)) {

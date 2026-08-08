@@ -53,19 +53,19 @@
             </div>
 
             <div class="dashboard-grid">
-                <div class="stat-card">
+                <div class="stat-card" onclick="showAttendance()">
                     <h3>Workers Present</h3>
                     <p class="stat-number" id="workers-present">0</p>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card" onclick="showCustomersDelivery()">
                     <h3>Pending Deliveries</h3>
                     <p class="stat-number" id="pending-deliveries">0</p>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card" onclick="showCustomersOutstanding()">
                     <h3>Outstanding Payments</h3>
                     <p class="stat-number" id="outstanding">0</p>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card" onclick="showExpenses()">
                     <h3>Petty Cash</h3>
                     <p class="stat-number" id="petty-cash">$0</p>
                 </div>
@@ -129,7 +129,7 @@
             <div class="content">
                 <input type="date" id="attendance-date" onchange="loadAttendance()">
                 <div id="attendance-list" class="list"></div>
-                <button class="primary-btn full-width" onclick="saveAttendance()">Save Attendance</button>
+                <button class="primary-btn full-width" onclick="saveAllAttendance()">Save Attendance</button>
             </div>
         </div>
 
