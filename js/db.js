@@ -1,47 +1,38 @@
 // IndexedDB Database for BrickManager
-// Local-only storage (no Firebase)
 
 const DB_NAME = 'BrickManagerDB';
 const DB_VERSION = 1;
 let db = null;
 
-// Initialize Database
 async function initDB() {
     return new Promise((resolve, reject) => {
         const request = indexedDB.open(DB_NAME, DB_VERSION);
-
         request.onerror = () => reject(request.error);
-        
-        request.onsuccess = () => {
-            db = request.result;
-            resolve(db);
-        };
-
+        request.onsuccess = () => { db = request.result; resolve(db); };
         request.onupgradeneeded = (event) => {
             const database = event.target.result;
-
             if (!database.objectStoreNames.contains('workers')) {
-                const workerStore = database.createObjectStore('workers', { keyPath: 'id', autoIncrement: true });
-                workerStore.createIndex('name', 'name', { unique: false });
+                const ws = database.createObjectStore('workers', { keyPath: 'id', autoIncrement: true });
+                ws.createIndex('name', 'name', { unique: false });
             }
-
             if (!database.objectStoreNames.contains('attendance')) {
-                const attendStore = database.createObjectStore('attendance', { keyPath: 'id', autoIncrement: true });
-                attendStore.createIndex('worker_id', 'worker_id', { unique: false });
-                attendStore.createIndex('date', 'date', { unique: false });
+                const as = database.createObjectStore('attendance', { keyPath: 'id', autoIncrement: true });
+                as.createIndex('worker_id', 'worker_id', { unique: false });
+                as.createIndex('date', 'date', { unique: false });
             }
-
             if (!database.objectStoreNames.contains('customers')) {
-                const custStore = database.createObjectStore('customers', { keyPath: 'id', autoIncrement: true });
-                custStore.createIndex('name', 'name', { unique: false });
-                custStore.createIndex('payment_date', 'payment_date', { unique: false });
+                const cs = database.createObjectStore('customers', { keyPath: 'id', autoIncrement: true });
+                cs.createIndex('name', 'name', { unique: false });
+                cs.createIndex('date', 'date', { unique: false });
             }
-
             if (!database.objectStoreNames.contains('expenses')) {
-                const expStore = database.createObjectStore('expenses', { keyPath: 'id', autoIncrement: true });
-                expStore.createIndex('date', 'date', { unique: false });
+                const es = database.createObjectStore('expenses', { keyPath: 'id', autoIncrement: true });
+                es.createIndex('date', 'date', { unique: false });
             }
-
+            if (!database.objectStoreNames.contains('daily_sales')) {
+                const ds = database.createObjectStore('daily_sales', { keyPath: 'id', autoIncrement: true });
+                ds.createIndex('date', 'date', { unique: false });
+            }
             if (!database.objectStoreNames.contains('settings')) {
                 database.createObjectStore('settings', { keyPath: 'key' });
             }
@@ -49,7 +40,6 @@ async function initDB() {
     });
 }
 
-// Generic CRUD
 function getAll(storeName) {
     return new Promise((resolve, reject) => {
         const tx = db.transaction(storeName, 'readonly');
@@ -113,56 +103,55 @@ async function getAttendanceByDate(date) {
     const all = await getAll('attendance');
     return all.filter(a => a.date === date);
 }
-
+async function getAllAttendance() { return getAll('attendance'); }
 async function getAttendanceByWorkerAndDate(workerId, date) {
     const all = await getAll('attendance');
     return all.find(a => a.worker_id === Number(workerId) && a.date === date);
 }
-
 async function saveAttendance(workerId, date, status) {
     const existing = await getAttendanceByWorkerAndDate(workerId, date);
-    if (existing) {
-        return update('attendance', { ...existing, status });
-    } else {
-        return add('attendance', { worker_id: workerId, date, status });
-    }
+    if (existing) return update('attendance', { ...existing, status });
+    return add('attendance', { worker_id: workerId, date, status });
 }
-
-async function getAllAttendance() { return getAll('attendance'); }
-
 async function deleteAllAttendance() {
     const all = await getAll('attendance');
-    for (const item of all) {
-        await remove('attendance', item.id);
-    }
+    for (const item of all) await remove('attendance', item.id);
 }
 
-// Customers
+// Customers (Cash Received)
 async function getCustomers() { return getAll('customers'); }
 async function getCustomer(id) { return getById('customers', id); }
 async function addCustomer(data) { return add('customers', data); }
 async function updateCustomer(data) { return update('customers', data); }
 async function deleteCustomer(id) { return remove('customers', id); }
 
-// Expenses
+// Expenses (Petty Cash)
 async function getExpenses() { return getAll('expenses'); }
 async function addExpense(data) { return add('expenses', data); }
 async function deleteExpense(id) { return remove('expenses', id); }
 
-// Settings - use localStorage for simplicity
-async function getSetting(key) {
-    return localStorage.getItem('brick_' + key);
+// Daily Sales
+async function getDailySales() { return getAll('daily_sales'); }
+async function getDailySalesByDate(date) {
+    const all = await getDailySales();
+    return all.find(s => s.date === date);
+}
+async function updateDailySales(date, amount) {
+    const existing = await getDailySalesByDate(date);
+    if (existing) {
+        return update('daily_sales', { ...existing, amount: existing.amount + amount });
+    }
+    return add('daily_sales', { date, amount });
 }
 
-async function setSetting(key, value) {
-    localStorage.setItem('brick_' + key, value);
-}
+// Settings
+async function getSetting(key) { return localStorage.getItem('brick_' + key); }
+async function setSetting(key, value) { localStorage.setItem('brick_' + key, value); }
 
 // Clear all
 async function clearAllData() {
-    // Clear localStorage settings
     localStorage.removeItem('brick_pin');
-    // Clear IndexedDB
+    localStorage.removeItem('brick_logged_in');
     const req = indexedDB.deleteDatabase('BrickManagerDB');
     req.onsuccess = () => console.log('DB deleted');
 }
@@ -173,24 +162,14 @@ async function exportAllData() {
     const attendance = await getAllAttendance();
     const customers = await getCustomers();
     const expenses = await getExpenses();
-    const payDate = await getSetting('pay_date');
-
-    return {
-        exportDate: new Date().toISOString(),
-        workers,
-        attendance,
-        customers,
-        expenses,
-        settings: { pay_date: payDate }
-    };
+    const dailySales = await getDailySales();
+    return { exportDate: new Date().toISOString(), workers, attendance, customers, expenses, dailySales };
 }
 
 async function checkAndResetAttendance() {
     const payDate = await getSetting('pay_date') || '25';
     const today = new Date();
-    const currentDay = today.getDate();
-    
-    if (Number(currentDay) >= Number(payDate)) {
+    if (Number(today.getDate()) >= Number(payDate)) {
         await deleteAllAttendance();
     }
 }

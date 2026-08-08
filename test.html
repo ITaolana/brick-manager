@@ -1,137 +1,43 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <title>BrickManager - Tests</title>
-    <style>
-        body { font-family: -apple-system, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; }
-        .pass { color: green; }
-        .fail { color: red; }
-        li { padding: 8px; border-bottom: 1px solid #eee; }
-    </style>
+<head><title>BrickManager Tests</title>
+<style>body{font-family:sans-serif;padding:20px;max-width:600px;margin:0 auto}.pass{color:green}.fail{color:red}li{padding:8px;border-bottom:1px solid #eee}</style>
 </head>
 <body>
-    <h1>BrickManager Tests</h1>
-    <button onclick="runTests()" style="padding:10px 20px;margin:10px 0;">Run Tests</button>
-    <div id="results"></div>
-    
-    <script src="js/db.js"></script>
-    <script>
-        const results = [];
-        
-        function test(name, fn) {
-            try {
-                fn();
-                results.push({ name, passed: true });
-            } catch (e) {
-                results.push({ name, passed: false, error: e.message });
-            }
-        }
-        
-        function assertEqual(actual, expected, msg) {
-            if (actual !== expected) {
-                throw new Error(msg || `Expected ${expected}, got ${actual}`);
-            }
-        }
-        
-        function assertTrue(val, msg) {
-            if (!val) throw new Error(msg || 'Expected true');
-        }
-        
-        async function runTests() {
-            results.length = 0;
-            const output = document.getElementById('results');
-            output.innerHTML = 'Running tests...';
-            
-            await initDB();
-            
-            test('Database initialized', () => {
-                assertTrue(db !== null, 'DB should exist');
-            });
-            
-            let testWorkerId;
-            test('Add worker', async () => {
-                testWorkerId = await addWorker({ name: 'John Doe', role: 'Mason' });
-                assertTrue(testWorkerId > 0);
-            });
-            
-            test('Get worker', async () => {
-                const worker = await getWorker(testWorkerId);
-                assertEqual(worker.name, 'John Doe');
-            });
-            
-            test('Update worker', async () => {
-                await updateWorker({ id: testWorkerId, name: 'John Doe', role: 'Foreman' });
-                const worker = await getWorker(testWorkerId);
-                assertEqual(worker.role, 'Foreman');
-            });
-            
-            let testCustomerId;
-            test('Add customer', async () => {
-                testCustomerId = await addCustomer({
-                    name: 'Test Customer',
-                    product_type: 'Bricks',
-                    payment_date: '2026-08-15',
-                    amount: 5000,
-                    needs_delivery: 1,
-                    delivery_address: '123 Main St',
-                    delivery_status: 'pending'
-                });
-                assertTrue(testCustomerId > 0);
-            });
-            
-            test('Toggle delivery', async () => {
-                await updateCustomer({ id: testCustomerId, name: 'Test', product_type: 'Bricks', payment_date: '2026-08-15', amount: 5000, needs_delivery: 1, delivery_address: '123', delivery_status: 'delivered' });
-                const c = await getCustomer(testCustomerId);
-                assertEqual(c.delivery_status, 'delivered');
-            });
-            
-            let testExpenseId;
-            test('Add expense', async () => {
-                testExpenseId = await addExpense({ description: 'Test', amount: 100, date: '2026-08-07' });
-                assertTrue(testExpenseId > 0);
-            });
-            
-            test('Get expenses', async () => {
-                const expenses = await getExpenses();
-                assertTrue(expenses.length > 0);
-            });
-            
-            test('Settings', async () => {
-                await setSetting('test_key', 'test_value');
-                const val = await getSetting('test_key');
-                assertEqual(val, 'test_value');
-            });
-            
-            test('Delete worker', async () => {
-                await deleteWorker(testWorkerId);
-                const w = await getWorker(testWorkerId);
-                assertTrue(w === undefined);
-            });
-            
-            test('Export data', async () => {
-                const data = await exportAllData();
-                assertTrue(data.workers !== undefined);
-                assertTrue(data.customers !== undefined);
-                assertTrue(data.expenses !== undefined);
-            });
-            
-            const passed = results.filter(r => r.passed).length;
-            const failed = results.filter(r => !r.passed).length;
-            
-            output.innerHTML = `
-                <h2>Results: ${passed}/${results.length} passed</h2>
-                <ul style="list-style:none;padding:0;">
-                    ${results.map(r => `
-                        <li class="${r.passed ? 'pass' : 'fail'}">
-                            ${r.passed ? '✓' : '✗'} ${r.name}
-                            ${!r.passed ? `<br><small>${r.error}</small>` : ''}
-                        </li>
-                    `).join('')}
-                </ul>
-            `;
-        }
-        
-        window.onload = runTests;
-    </script>
+<h1>BrickManager Tests</h1>
+<button onclick="runTests()" style="padding:10px 20px;margin:10px 0;">Run Tests</button>
+<div id="results"></div>
+<script src="js/db.js"></script>
+<script>
+const results = [];
+function test(name,fn){try{fn();results.push({name,passed:true})}catch(e){results.push({name,passed:false,error:e.message})}}
+function assertEqual(a,e,msg){if(a!==e)throw new Error(msg||'Expected '+e+', got '+a)}
+function assertTrue(v,msg){if(!v)throw new Error(msg||'Expected true')}
+
+async function runTests(){
+results.length=0;document.getElementById('results').innerHTML='Running...';
+await initDB();
+
+test('Database initialized',()=>{assertTrue(db!==null)});
+
+let wid;test('Add worker',async()=>{wid=await addWorker({name:'John',role:'Mason'});assertTrue(wid>0)});
+test('Get worker',async()=>{const w=await getWorker(wid);assertEqual(w.name,'John')});
+test('Update worker',async()=>{await updateWorker({id:wid,name:'John',role:'Foreman'});const w=await getWorker(wid);assertEqual(w.role,'Foreman')});
+
+let cid;test('Add cash received',async()=>{cid=await addCustomer({name:'Test',amount:500,date:'2026-08-07'});assertTrue(cid>0)});
+test('Get customers',async()=>{const c=await getCustomers();assertTrue(c.length>0)});
+
+let eid;test('Add expense',async()=>{eid=await addExpense({description:'Test',amount:100,date:'2026-08-07'});assertTrue(eid>0)});
+test('Get expenses',async()=>{const e=await getExpenses();assertTrue(e.length>0)});
+
+test('Settings',async()=>{await setSetting('test','val');const v=await getSetting('test');assertEqual(v,'val')});
+
+test('Delete worker',async()=>{await deleteWorker(wid);const w=await getWorker(wid);assertTrue(w===undefined)});
+
+const passed=results.filter(r=>r.passed).length;
+document.getElementById('results').innerHTML=`<h2>Results: ${passed}/${results.length} passed</h2><ul style="list-style:none;padding:0;">${results.map(r=>`<li class="${r.passed?'pass':'fail'}">${r.passed?'✓':'✗'} ${r.name}${!r.passed?'<br><small>'+r.error+'</small>':''}</li>`).join('')}</ul>`;
+}
+window.onload=runTests;
+</script>
 </body>
 </html>

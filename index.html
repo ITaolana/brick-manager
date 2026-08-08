@@ -61,14 +61,28 @@
                     <h3>Pending Deliveries</h3>
                     <p class="stat-number" id="pending-deliveries">0</p>
                 </div>
-                <div class="stat-card" onclick="showCustomersOutstanding()">
-                    <h3>Outstanding Payments</h3>
-                    <p class="stat-number" id="outstanding">0</p>
+                <div class="stat-card" onclick="showCashReceived()">
+                    <h3>Today's Cash</h3>
+                    <p class="stat-number" id="cash-received">R0</p>
                 </div>
                 <div class="stat-card" onclick="showExpenses()">
                     <h3>Petty Cash</h3>
-                    <p class="stat-number" id="petty-cash">$0</p>
+                    <p class="stat-number" id="petty-cash">R0</p>
                 </div>
+                <div class="stat-card" onclick="showBankBalance()">
+                    <h3>Cash in Bank</h3>
+                    <p class="stat-number" id="cash-in-bank">R0</p>
+                </div>
+            </div>
+            
+            <div class="pay-date-section">
+                <label>Pay Day:</label>
+                <select id="pay-date" onchange="updatePayDate()">
+                    <option value="1">1st</option>
+                    <option value="15">15th</option>
+                    <option value="25">25th</option>
+                    <option value="30">30th</option>
+                </select>
             </div>
 
             <div class="quick-actions">
@@ -92,16 +106,7 @@
                 <button class="add-btn" onclick="showAddWorker()">+ Add</button>
             </header>
             <div class="content">
-                <div class="pay-date-section">
-                    <label>Pay Date (day of month):</label>
-                    <select id="pay-date" onchange="updatePayDate()">
-                        <option value="1">1st</option>
-                        <option value="15">15th</option>
-                        <option value="25">25th</option>
-                        <option value="30">30th</option>
-                    </select>
-                    <button class="secondary-btn" onclick="checkAttendanceReset()">Reset Attendance Now</button>
-                </div>
+                <button class="secondary-btn" style="margin-bottom:15px" onclick="showAttendance()">View/Edit Attendance</button>
                 <div id="workers-list" class="list"></div>
             </div>
         </div>
@@ -221,24 +226,32 @@
             </header>
             <div class="content">
                 <div class="report-section">
-                    <h3>Weekly Sales</h3>
-                    <p class="report-amount" id="weekly-sales">$0</p>
+                    <h3>Today's Cash Received</h3>
+                    <p class="report-amount" id="today-sales">R0</p>
                 </div>
                 <div class="report-section">
-                    <h3>Monthly Sales</h3>
-                    <p class="report-amount" id="monthly-sales">$0</p>
+                    <h3>Weekly Total Sales</h3>
+                    <p class="report-amount" id="weekly-sales">R0</p>
+                </div>
+                <div class="report-section">
+                    <h3>Monthly Total Sales</h3>
+                    <p class="report-amount" id="monthly-sales">R0</p>
                 </div>
                 <div class="report-section">
                     <h3>Weekly Expenses</h3>
-                    <p class="report-amount" id="weekly-expenses">$0</p>
+                    <p class="report-amount" id="weekly-expenses">R0</p>
                 </div>
                 <div class="report-section">
                     <h3>Monthly Expenses</h3>
-                    <p class="report-amount" id="monthly-expenses">$0</p>
+                    <p class="report-amount" id="monthly-expenses">R0</p>
+                </div>
+                <div class="report-section">
+                    <h3>Cash in Bank</h3>
+                    <p class="report-amount" id="bank-balance">R0</p>
                 </div>
                 <div class="report-section summary">
-                    <h3>Profit/Loss (This Month)</h3>
-                    <p class="report-amount" id="monthly-profit">$0</p>
+                    <h3>Monthly Profit</h3>
+                    <p class="report-amount" id="monthly-profit">R0</p>
                 </div>
                 <button class="primary-btn full-width" onclick="generateReports()">🔄 Refresh Reports</button>
             </div>
