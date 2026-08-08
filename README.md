@@ -53,9 +53,13 @@ A mobile-first admin application for brick manufacturing businesses. Manage work
 
 ## Installation
 
-### Option 1: GitHub Pages (Recommended)
-1. Visit: https://itaolana.github.io/brick-manager/
-2. Add to home screen for app-like experience
+### GitHub Pages (Recommended)
+1. Go to your repo: https://github.com/ITaolana/brick-manager
+2. Settings → Pages
+3. Source: Deploy from a branch
+4. Branch: main, Folder: / (root)
+5. Save
+6. Visit: https://itaolana.github.io/brick-manager/
 
 ### Option 2: Local Testing
 ```bash
