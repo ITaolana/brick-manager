@@ -131,8 +131,15 @@ function showDashboard() {
 }
 
 // Workers
-async function showAddWorker(editId = null) {
-    showScreen('workers-screen');
+async function showAddWorker() {
+    const name = prompt('Worker Name:');
+    if (!name) return;
+    
+    const role = prompt('Role (e.g., Mason, Driver):');
+    if (!role) return;
+    
+    await addWorker({ name, role });
+    alert('Worker added!');
     loadWorkers();
 }
 
@@ -356,16 +363,31 @@ async function showAddCustomer() {
     if (!name) return;
     
     const products = ['Bricks', 'Fine Sand', 'Rough Sand', 'Quarry', 'TLB for Hire'];
-    const productType = prompt('Product (' + products.join(', ') + '):');
+    let productType = prompt('Product (' + products.join(', ') + '):');
     if (!productType) return;
     
-    const paymentDate = prompt('Payment Date (YYYY-MM-DD):');
-    if (!paymentDate) return;
+    // Validate product
+    productType = products.find(p => p.toLowerCase() === productType.toLowerCase()) || productType;
+    
+    let paymentDate = prompt('Payment Date (YYYY-MM-DD) or press Enter for today:');
+    if (!paymentDate) {
+        paymentDate = new Date().toISOString().split('T')[0];
+    }
+    
+    // Validate date format
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(paymentDate)) {
+        alert('Date must be in format YYYY-MM-DD');
+        return;
+    }
     
     const amount = prompt('Amount:');
-    if (!amount) return;
+    if (!amount || isNaN(amount)) {
+        alert('Please enter a valid amount');
+        return;
+    }
     
-    const needsDelivery = confirm('Needs delivery?');
+    const needsDelivery = confirm('Needs delivery? Click OK for Yes, Cancel for No');
     const address = needsDelivery ? prompt('Delivery Address:') : '';
     
     await addCustomer({
@@ -374,7 +396,7 @@ async function showAddCustomer() {
         payment_date: paymentDate,
         amount: Number(amount),
         needs_delivery: needsDelivery ? 1 : 0,
-        delivery_address: address,
+        delivery_address: address || '',
         delivery_status: needsDelivery ? 'pending' : 'none'
     });
     
@@ -394,7 +416,10 @@ async function showAddExpense() {
     if (!desc) return;
     
     const amount = prompt('Amount:');
-    if (!amount) return;
+    if (!amount || isNaN(amount)) {
+        alert('Please enter a valid amount');
+        return;
+    }
     
     const date = new Date().toISOString().split('T')[0];
     
