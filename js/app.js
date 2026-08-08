@@ -21,6 +21,13 @@ async function checkPINSetup() {
     if (!existingPIN || existingPIN === 'null' || existingPIN === '') {
         pinMode = 'setup';
         document.getElementById('pin-message').textContent = 'Create a 4-digit PIN';
+    } else {
+        // Check if already logged in
+        const isLoggedIn = localStorage.getItem('brick_logged_in');
+        if (isLoggedIn === 'true') {
+            showScreen('dashboard-screen');
+            initDashboard();
+        }
     }
 }
 
@@ -58,6 +65,7 @@ async function validatePIN() {
     if (pinMode === 'setup') {
         if (currentPIN.length === 4) {
             await setSetting('pin', currentPIN);
+            localStorage.setItem('brick_logged_in', 'true');
             console.log('PIN saved');
             pinMode = 'enter';
             currentPIN = '';
@@ -71,6 +79,7 @@ async function validatePIN() {
         const storedPIN = await getSetting('pin');
         console.log('Stored PIN:', storedPIN);
         if (currentPIN === storedPIN) {
+            localStorage.setItem('brick_logged_in', 'true');
             currentPIN = '';
             updatePINDots();
             showScreen('dashboard-screen');
