@@ -84,10 +84,15 @@ async function validatePIN() {
 }
 
 function showScreen(screenId) {
-    console.log('Showing screen:', screenId);
+    const screen = document.getElementById(screenId);
+    if (!screen) {
+        alert('Screen not found: ' + screenId);
+        return;
+    }
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById(screenId).classList.add('active');
-    document.getElementById('menu-dropdown').classList.remove('show');
+    screen.classList.add('active');
+    var dropdown = document.getElementById('menu-dropdown');
+    if (dropdown) dropdown.classList.remove('show');
 }
 
 function toggleMenu() {
